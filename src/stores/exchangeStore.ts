@@ -9,6 +9,7 @@ import {
   EarnPosition,
   ExchangeStatus,
 } from '../services/exchanges';
+import { transactionSyncService } from '../services/sync';
 import { getDb, generateId } from '../database/init';
 import { exchanges, balances, positions } from '../database/schema';
 import { eq } from 'drizzle-orm';
@@ -52,6 +53,8 @@ interface ExchangeState {
   disconnectExchange: (accountId: string) => Promise<void>;
   syncExchange: (accountId: string) => Promise<void>;
   syncAllExchanges: () => Promise<void>;
+  syncTransactions: (accountId: string, options?: { since?: Date }) => Promise<{ tradesAdded: number; transfersAdded: number; errors: string[] }>;
+  syncAllTransactions: (options?: { since?: Date }) => Promise<void>;
 
   // Real-time subscription management
   subscribeToUpdates: (accountId: string) => () => void;
@@ -326,6 +329,32 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
 
     await Promise.allSettled(
       connectedAccounts.map(account => syncExchange(account.id))
+    );
+  },
+
+  syncTransactions: async (accountId, options = {}) => {
+    const adapter = exchangeManager.getAdapter(accountId);
+    if (!adapter) {
+      throw new Error('Exchange not connected');
+    }
+
+    const result = await transactionSyncService.syncExchangeTransactions(accountId, {
+      since: options.since,
+    });
+
+    return {
+      tradesAdded: result.tradesAdded,
+      transfersAdded: result.transfersAdded,
+      errors: result.errors,
+    };
+  },
+
+  syncAllTransactions: async (options = {}) => {
+    const { accounts, syncTransactions } = get();
+    const connectedAccounts = accounts.filter(a => a.isConnected);
+
+    await Promise.allSettled(
+      connectedAccounts.map(account => syncTransactions(account.id, options))
     );
   },
 
