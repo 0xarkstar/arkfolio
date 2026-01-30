@@ -10,6 +10,7 @@ const SUPPORTED_CHAINS = [
   { id: Chain.POLYGON, name: 'Polygon', icon: 'P' },
   { id: Chain.BSC, name: 'BSC', icon: 'B' },
   { id: Chain.AVALANCHE, name: 'Avalanche', icon: 'A' },
+  { id: Chain.SOLANA, name: 'Solana', icon: 'S' },
 ];
 
 export function WalletsPage() {
