@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDefiStore, DefiPosition } from '../../stores/defiStore';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import Decimal from 'decimal.js';
+
+type SortField = 'protocol' | 'value' | 'apy' | 'type';
+type SortDirection = 'asc' | 'desc';
 
 // Mock data for demonstration when no real data exists
 const mockPositions: DefiPosition[] = [
@@ -141,6 +144,13 @@ export function DefiPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [positionToRemove, setPositionToRemove] = useState<DefiPosition | null>(null);
+
+  // Search, sort, and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('value');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [filterChain, setFilterChain] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
 
   // Form state
   const [formProtocol, setFormProtocol] = useState('Aave V3');
@@ -285,6 +295,117 @@ export function DefiPage() {
   const positions = storePositions.length > 0 ? storePositions : mockPositions;
   const pointsBalances = storePoints.length > 0 ? storePoints : mockPoints;
 
+  // Get unique chains and types for filter dropdowns
+  const uniqueChains = useMemo(() =>
+    Array.from(new Set(positions.map(p => p.chain))).sort(),
+    [positions]
+  );
+  const uniqueTypes = useMemo(() =>
+    Array.from(new Set(positions.map(p => p.positionType))).sort(),
+    [positions]
+  );
+
+  // Filter and sort positions
+  const filteredAndSortedPositions = useMemo(() => {
+    let filtered = positions;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        p => p.protocol.toLowerCase().includes(query) ||
+             p.assets.some(a => a.toLowerCase().includes(query)) ||
+             p.chain.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply chain filter
+    if (filterChain !== 'all') {
+      filtered = filtered.filter(p => p.chain === filterChain);
+    }
+
+    // Apply type filter
+    if (filterType !== 'all') {
+      filtered = filtered.filter(p => p.positionType === filterType);
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'protocol':
+          comparison = a.protocol.localeCompare(b.protocol);
+          break;
+        case 'value':
+          comparison = a.currentValueUsd.minus(b.currentValueUsd).toNumber();
+          break;
+        case 'apy':
+          comparison = (a.apy || 0) - (b.apy || 0);
+          break;
+        case 'type':
+          comparison = a.positionType.localeCompare(b.positionType);
+          break;
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    return sorted;
+  }, [positions, searchQuery, filterChain, filterType, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <span className={`ml-1 ${sortField === field ? 'text-primary-400' : 'text-surface-600'}`}>
+      {sortField === field ? (sortDirection === 'desc' ? '↓' : '↑') : '↕'}
+    </span>
+  );
+
+  const handleExportCSV = () => {
+    if (positions.length === 0) {
+      toast.error('No positions to export');
+      return;
+    }
+
+    const headers = ['Protocol', 'Type', 'Chain', 'Assets', 'Value (USD)', 'Cost Basis (USD)', 'APY (%)', 'Health Factor', 'P&L (USD)', 'P&L (%)'];
+    const rows = filteredAndSortedPositions.map(p => {
+      const pnl = p.currentValueUsd.minus(p.costBasisUsd).toNumber();
+      const pnlPercent = p.costBasisUsd.toNumber() > 0
+        ? (pnl / p.costBasisUsd.toNumber() * 100)
+        : 0;
+      return [
+        p.protocol,
+        p.positionType,
+        p.chain,
+        p.assets.join('/'),
+        p.currentValueUsd.toFixed(2),
+        p.costBasisUsd.toFixed(2),
+        p.apy?.toFixed(2) || '',
+        p.healthFactor?.toFixed(2) || '',
+        pnl.toFixed(2),
+        pnlPercent.toFixed(2),
+      ];
+    });
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `defi-positions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('DeFi positions exported to CSV');
+  };
+
   const totalValue = storePositions.length > 0
     ? getTotalValueUsd().toNumber()
     : mockPositions.reduce((sum, p) => sum + p.currentValueUsd.toNumber(), 0);
@@ -354,40 +475,104 @@ export function DefiPage() {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Total DeFi Value</p>
-          <p className="text-2xl font-bold text-surface-100 font-tabular">
-            {formatCurrency(totalValue)}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Active Positions</p>
-          <p className="text-2xl font-bold text-surface-100">{positions.length}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Avg. APY</p>
-          <p className="text-2xl font-bold text-profit">
-            {isNaN(avgApy) ? '-' : `${avgApy.toFixed(1)}%`}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Protocols</p>
-          <p className="text-2xl font-bold text-surface-100">
-            {new Set(positions.map((p) => p.protocol)).size}
-          </p>
-        </div>
+        {isLoading && positions.length === 0 ? (
+          <>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-32 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-16 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-20 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-20 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-12 bg-surface-600 rounded" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Total DeFi Value</p>
+              <p className="text-2xl font-bold text-surface-100 font-tabular">
+                {formatCurrency(totalValue)}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Active Positions</p>
+              <p className="text-2xl font-bold text-surface-100">{positions.length}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Avg. APY</p>
+              <p className="text-2xl font-bold text-profit">
+                {isNaN(avgApy) ? '-' : `${avgApy.toFixed(1)}%`}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Protocols</p>
+              <p className="text-2xl font-bold text-surface-100">
+                {new Set(positions.map((p) => p.protocol)).size}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Positions Table */}
       <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-surface-100">DeFi Positions</h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-secondary text-sm"
-          >
-            Add Position
-          </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold text-surface-100">
+            DeFi Positions
+            {(searchQuery || filterChain !== 'all' || filterType !== 'all') &&
+              ` (${filteredAndSortedPositions.length} of ${positions.length})`}
+          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="input py-1.5 text-sm w-32"
+            />
+            <select
+              value={filterChain}
+              onChange={(e) => setFilterChain(e.target.value)}
+              className="input py-1.5 text-sm"
+            >
+              <option value="all">All Chains</option>
+              {uniqueChains.map(chain => (
+                <option key={chain} value={chain}>{chain}</option>
+              ))}
+            </select>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="input py-1.5 text-sm"
+            >
+              <option value="all">All Types</option>
+              {uniqueTypes.map(type => (
+                <option key={type} value={type}>{getPositionTypeLabel(type)}</option>
+              ))}
+            </select>
+            {positions.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                className="text-xs text-primary-400 hover:text-primary-300"
+              >
+                Export CSV
+              </button>
+            )}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn-secondary text-sm"
+            >
+              Add Position
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -402,16 +587,36 @@ export function DefiPage() {
               Add your wallet addresses to track DeFi positions.
             </p>
           </div>
+        ) : filteredAndSortedPositions.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-surface-400 mb-2">No positions match your filters</p>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setFilterChain('all');
+                setFilterType('all');
+              }}
+              className="text-sm text-primary-400 hover:text-primary-300"
+            >
+              Clear all filters
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-700">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
-                    Protocol
+                  <th
+                    className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('protocol')}
+                  >
+                    Protocol<SortIcon field="protocol" />
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
-                    Type
+                  <th
+                    className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('type')}
+                  >
+                    Type<SortIcon field="type" />
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
                     Assets
@@ -419,11 +624,17 @@ export function DefiPage() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
                     Chain
                   </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
-                    Value
+                  <th
+                    className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('value')}
+                  >
+                    Value<SortIcon field="value" />
                   </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
-                    APY
+                  <th
+                    className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('apy')}
+                  >
+                    APY<SortIcon field="apy" />
                   </th>
                   <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
                     Health
@@ -432,7 +643,7 @@ export function DefiPage() {
                 </tr>
               </thead>
               <tbody>
-                {positions.map((position) => (
+                {filteredAndSortedPositions.map((position) => (
                   <tr
                     key={position.id}
                     className="border-b border-surface-800 hover:bg-surface-800/50"
