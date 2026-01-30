@@ -138,6 +138,8 @@ export function DefiPage() {
     positions: storePositions,
     pointsBalances: storePoints,
     isLoading,
+    isSyncing,
+    lastZapperSync,
     loadPositions,
     loadPoints,
     getTotalValueUsd,
@@ -146,6 +148,8 @@ export function DefiPage() {
     addPosition,
     removePosition,
     addPoints,
+    syncFromZapper,
+    isZapperConfigured,
   } = useDefiStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -300,9 +304,20 @@ export function DefiPage() {
     loadPoints();
   }, [loadPositions, loadPoints]);
 
-  // Use store data if available, otherwise show mock data for demo
-  const positions = storePositions.length > 0 ? storePositions : mockPositions;
-  const pointsBalances = storePoints.length > 0 ? storePoints : mockPoints;
+  const handleSyncFromZapper = async () => {
+    try {
+      await syncFromZapper();
+      toast.success('DeFi positions synced successfully');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sync positions';
+      toast.error(message);
+    }
+  };
+
+  // Use store data if available, otherwise show mock data for demo (only if Zapper not configured)
+  const showMockData = storePositions.length === 0 && !isZapperConfigured();
+  const positions = storePositions.length > 0 ? storePositions : (showMockData ? mockPositions : []);
+  const pointsBalances = storePoints.length > 0 ? storePoints : (showMockData ? mockPoints : []);
 
   // Get unique chains and types for filter dropdowns
   const uniqueChains = useMemo(() =>
@@ -559,6 +574,17 @@ export function DefiPage() {
                 Export CSV
               </Button>
             )}
+            {isZapperConfigured() && (
+              <Button
+                onClick={handleSyncFromZapper}
+                variant="secondary"
+                size="sm"
+                loading={isSyncing}
+                disabled={isSyncing}
+              >
+                {isSyncing ? 'Syncing...' : 'Sync from Zapper'}
+              </Button>
+            )}
             <Button
               onClick={() => setShowAddModal(true)}
               variant="secondary"
@@ -569,7 +595,14 @@ export function DefiPage() {
           </div>
         </div>
 
-        {isLoading ? (
+        {/* Last sync info */}
+        {lastZapperSync && (
+          <div className="mb-4 text-xs text-surface-500">
+            Last synced from Zapper: {lastZapperSync.toLocaleString()}
+          </div>
+        )}
+
+        {isLoading || isSyncing ? (
           <div className="text-center py-12">
             <div className="text-surface-400">Loading positions...</div>
           </div>
@@ -812,22 +845,53 @@ export function DefiPage() {
         </div>
       </Card>
 
-      {/* Coming Soon Notice */}
+      {/* Setup Notice */}
       {storePositions.length === 0 && (
         <Card className="p-6 border-primary-600/30 bg-primary-600/5">
           <h3 className="text-lg font-semibold text-surface-100 mb-2">
             DeFi Position Tracking
           </h3>
-          <p className="text-surface-400 text-sm mb-4">
-            Automatic DeFi position detection is coming soon. Currently showing demo data.
-            <br />
-            Supported protocols: Uniswap, Aave, Morpho, Pendle, EigenLayer, and more.
-          </p>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setShowAddModal(true)}>
-              Add Position Manually
-            </Button>
-          </div>
+          {!isZapperConfigured() ? (
+            <>
+              <p className="text-surface-400 text-sm mb-4">
+                To automatically detect your DeFi positions, set up your Zapper API key in Settings.
+                <br />
+                Supported protocols: Uniswap, Aave, Morpho, Pendle, EigenLayer, and more.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => window.location.hash = '#/settings'}
+                >
+                  Go to Settings
+                </Button>
+                <Button variant="secondary" onClick={() => setShowAddModal(true)}>
+                  Add Position Manually
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-surface-400 text-sm mb-4">
+                Click "Sync from Zapper" to detect your DeFi positions automatically.
+                <br />
+                Make sure you have wallets connected in the Wallets page.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="primary"
+                  onClick={handleSyncFromZapper}
+                  loading={isSyncing}
+                  disabled={isSyncing}
+                >
+                  Sync from Zapper
+                </Button>
+                <Button variant="secondary" onClick={() => setShowAddModal(true)}>
+                  Add Position Manually
+                </Button>
+              </div>
+            </>
+          )}
         </Card>
       )}
 

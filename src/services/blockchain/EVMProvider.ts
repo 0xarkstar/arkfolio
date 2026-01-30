@@ -10,6 +10,7 @@ import {
   TokenTransfer,
 } from './types';
 import { CHAIN_CONFIGS, COMMON_TOKENS } from './chains';
+import { tokenRegistry } from './TokenRegistry';
 
 interface EtherscanTokenTx {
   blockNumber: string;
@@ -157,8 +158,14 @@ export class EVMProvider {
   /**
    * Get all ERC-20 token balances for an address
    * Uses token transfer history to discover tokens
+   *
+   * @param address - Wallet address
+   * @param options.filterUnknown - If true, filter out tokens not registered on CoinGecko (default: false)
    */
-  async getAllTokenBalances(address: string): Promise<TokenBalance[]> {
+  async getAllTokenBalances(
+    address: string,
+    options: { filterUnknown?: boolean } = {}
+  ): Promise<TokenBalance[]> {
     await this.rateLimitWait();
 
     // Get token transfer history to discover tokens
@@ -187,13 +194,31 @@ export class EVMProvider {
       tokenAddresses.add(tx.contractAddress.toLowerCase());
     });
 
+    // Filter by registered tokens if requested
+    let addressesToFetch = Array.from(tokenAddresses);
+    if (options.filterUnknown) {
+      const { registered } = await tokenRegistry.filterRegisteredTokens(
+        addressesToFetch,
+        this.chain
+      );
+      addressesToFetch = registered;
+    }
+
     // Fetch balance for each token
     const balances: TokenBalance[] = [];
 
-    for (const tokenAddress of tokenAddresses) {
+    for (const tokenAddress of addressesToFetch) {
       try {
         const balance = await this.getTokenBalance(address, tokenAddress);
         if (balance && balance.balance.greaterThan(0)) {
+          // Enrich with metadata from registry if available
+          if (options.filterUnknown) {
+            const metadata = await tokenRegistry.getTokenMetadata(tokenAddress, this.chain);
+            if (metadata) {
+              balance.token.name = metadata.name;
+              balance.token.symbol = metadata.symbol;
+            }
+          }
           balances.push(balance);
         }
       } catch (error) {
@@ -365,6 +390,20 @@ export class EVMProvider {
     if (tx.to && funcName) return 'contract_interaction';
 
     return 'unknown';
+  }
+
+  /**
+   * Check if a token is registered on CoinGecko
+   */
+  async isTokenRegistered(tokenAddress: string): Promise<boolean> {
+    return tokenRegistry.isRegisteredToken(tokenAddress, this.chain);
+  }
+
+  /**
+   * Pre-load the token registry
+   */
+  async preloadTokenRegistry(): Promise<void> {
+    await tokenRegistry.loadTokenList();
   }
 
   /**

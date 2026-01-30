@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { SearchInput } from '../../components/SearchInput';
-import { Select, Input } from '../../components/Input';
+import { Select, Input, Switch } from '../../components/Input';
 import { ChainAvatar, AssetAvatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
 import { CopyButton } from '../../components/CopyButton';
@@ -38,6 +38,8 @@ export function WalletsPage() {
     removeWallet,
     syncWallet,
     getTotalValueUsd,
+    showUnknownTokens,
+    setShowUnknownTokens,
   } = useWalletsStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -299,6 +301,14 @@ export function WalletsPage() {
               size="sm"
               className="w-40"
             />
+            <div className="flex items-center gap-2 px-2 py-1 bg-surface-800 rounded-lg" title="Show tokens not listed on CoinGecko">
+              <span className="text-xs text-surface-400 whitespace-nowrap">Unknown tokens</span>
+              <Switch
+                checked={showUnknownTokens}
+                onChange={setShowUnknownTokens}
+                size="sm"
+              />
+            </div>
             {wallets.length > 0 && (
               <Button onClick={handleExportCSV} variant="ghost" size="xs">
                 Export CSV

@@ -114,14 +114,22 @@ class WalletService {
 
   /**
    * Get all token balances for a single chain
+   *
+   * @param chain - The blockchain to query
+   * @param address - The wallet address
+   * @param options.useCommonOnly - If true, only fetch common tokens (faster)
+   * @param options.filterUnknown - If true, filter out tokens not registered on CoinGecko
    */
   async getTokenBalances(
     chain: Chain,
     address: string,
-    useCommonOnly: boolean = false
+    options: { useCommonOnly?: boolean; filterUnknown?: boolean } = {}
   ): Promise<TokenBalance[]> {
+    const { useCommonOnly = false, filterUnknown = false } = options;
+
     try {
       if (chain === Chain.SOLANA) {
+        // TODO: Add filtering support for Solana tokens
         return await this.solanaProvider.getTokenBalances(address);
       }
 
@@ -134,7 +142,7 @@ class WalletService {
       if (useCommonOnly) {
         return await provider.getCommonTokenBalances(address);
       }
-      return await provider.getAllTokenBalances(address);
+      return await provider.getAllTokenBalances(address, { filterUnknown });
     } catch (error) {
       console.error(`Failed to fetch token balances for ${chain}:`, error);
       return [];
@@ -165,6 +173,12 @@ class WalletService {
 
   /**
    * Get wallet summary across all enabled chains
+   *
+   * @param address - The wallet address
+   * @param options.chains - Specific chains to query
+   * @param options.includeNFTs - Include NFT count (not implemented)
+   * @param options.useCommonTokensOnly - Only fetch common tokens (faster)
+   * @param options.filterUnknownTokens - Filter out tokens not registered on CoinGecko
    */
   async getWalletSummary(
     address: string,
@@ -172,16 +186,21 @@ class WalletService {
       chains?: Chain[];
       includeNFTs?: boolean;
       useCommonTokensOnly?: boolean;
+      filterUnknownTokens?: boolean;
     } = {}
   ): Promise<WalletSummary> {
     const chains = options.chains || Array.from(this.providers.keys());
     const useCommonOnly = options.useCommonTokensOnly ?? true;
+    const filterUnknown = options.filterUnknownTokens ?? false;
 
     const chainResults = await Promise.all(
       chains.map(async (chain) => {
         const [nativeBalance, tokenBalances] = await Promise.all([
           this.getNativeBalance(chain, address),
-          this.getTokenBalances(chain, address, useCommonOnly),
+          this.getTokenBalances(chain, address, {
+            useCommonOnly,
+            filterUnknown,
+          }),
         ]);
 
         return {

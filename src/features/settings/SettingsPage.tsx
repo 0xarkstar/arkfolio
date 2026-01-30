@@ -3,11 +3,12 @@ import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Switch, Select } from '../../components/Input';
+import { Switch, Select, Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Alert } from '../../components/Alert';
 import { SkeletonCard } from '../../components/Skeleton';
+import { zapperService } from '../../services/defi';
 import {
   settings as settingsTable,
   exchanges as exchangesTable,
@@ -28,9 +29,81 @@ export function SettingsPage() {
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  // Zapper API key state
+  const [zapperApiKey, setZapperApiKey] = useState('');
+  const [zapperApiKeyMasked, setZapperApiKeyMasked] = useState<string | null>(null);
+  const [isTestingZapper, setIsTestingZapper] = useState(false);
+  const [zapperConfigured, setZapperConfigured] = useState(false);
+
   useEffect(() => {
     loadSettings();
+    // Load Zapper API key from safe storage
+    loadZapperApiKey();
   }, [loadSettings]);
+
+  const loadZapperApiKey = async () => {
+    try {
+      if (window.electronAPI) {
+        const key = await window.electronAPI.safeStorage.decrypt('zapper_api_key');
+        if (key) {
+          zapperService.configure({ apiKey: key });
+          setZapperConfigured(true);
+          setZapperApiKeyMasked(zapperService.getApiKeyMasked());
+        }
+      }
+    } catch {
+      // No key stored
+    }
+  };
+
+  const handleSaveZapperApiKey = async () => {
+    if (!zapperApiKey.trim()) {
+      toast.error('Please enter an API key');
+      return;
+    }
+
+    setIsTestingZapper(true);
+    try {
+      // Configure and test
+      zapperService.configure({ apiKey: zapperApiKey.trim() });
+      const isValid = await zapperService.testConnection();
+
+      if (!isValid) {
+        toast.error('Invalid API key. Please check and try again.');
+        zapperService.clearConfig();
+        return;
+      }
+
+      // Save to safe storage
+      if (window.electronAPI) {
+        await window.electronAPI.safeStorage.encrypt('zapper_api_key', zapperApiKey.trim());
+      }
+
+      setZapperConfigured(true);
+      setZapperApiKeyMasked(zapperService.getApiKeyMasked());
+      setZapperApiKey('');
+      toast.success('Zapper API key saved successfully');
+    } catch (error) {
+      toast.error('Failed to save API key');
+      zapperService.clearConfig();
+    } finally {
+      setIsTestingZapper(false);
+    }
+  };
+
+  const handleRemoveZapperApiKey = async () => {
+    try {
+      if (window.electronAPI) {
+        await window.electronAPI.safeStorage.delete('zapper_api_key');
+      }
+      zapperService.clearConfig();
+      setZapperConfigured(false);
+      setZapperApiKeyMasked(null);
+      toast.info('Zapper API key removed');
+    } catch {
+      toast.error('Failed to remove API key');
+    }
+  };
 
   const handleSettingChange = async <K extends keyof AppSettings>(
     key: K,
@@ -288,6 +361,23 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div>
+              <p className="font-medium text-surface-100">Realtime Sync</p>
+              <p className="text-sm text-surface-400">
+                Use WebSocket for instant balance/position updates
+                <br />
+                <span className="text-surface-500 text-xs">
+                  Uses more battery and resources. Recommended for active trading.
+                </span>
+              </p>
+            </div>
+            <Switch
+              checked={settings.realtimeSync}
+              onChange={(checked) => handleSettingChange('realtimeSync', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
               <p className="font-medium text-surface-100">Notifications</p>
               <p className="text-sm text-surface-400">Receive alerts for price movements</p>
             </div>
@@ -334,6 +424,63 @@ export function SettingsPage() {
               ]}
               className="w-40"
             />
+          </div>
+        </div>
+      </Card>
+
+      {/* API Keys */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">API Keys</h2>
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-medium text-surface-100">Zapper API Key</p>
+                <p className="text-sm text-surface-400">
+                  Required for automatic DeFi position detection.{' '}
+                  <a
+                    href="https://studio.zapper.xyz/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300"
+                  >
+                    Get your key
+                  </a>
+                </p>
+              </div>
+            </div>
+            {zapperConfigured ? (
+              <div className="flex items-center gap-3">
+                <div className="flex-1 px-3 py-2 bg-surface-800 rounded-lg text-surface-300 font-mono text-sm">
+                  {zapperApiKeyMasked}
+                </div>
+                <Button
+                  onClick={handleRemoveZapperApiKey}
+                  variant="danger"
+                  size="sm"
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Input
+                  type="password"
+                  value={zapperApiKey}
+                  onChange={(e) => setZapperApiKey(e.target.value)}
+                  placeholder="Enter your Zapper API key"
+                  className="flex-1 font-mono"
+                />
+                <Button
+                  onClick={handleSaveZapperApiKey}
+                  disabled={isTestingZapper || !zapperApiKey.trim()}
+                  loading={isTestingZapper}
+                  size="sm"
+                >
+                  Save
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
