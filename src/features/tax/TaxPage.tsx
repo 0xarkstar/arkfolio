@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTaxStore } from '../../stores/taxStore';
+import { useExchangeStore } from '../../stores/exchangeStore';
 import Decimal from 'decimal.js';
 
 export function TaxPage() {
@@ -14,7 +15,28 @@ export function TaxPage() {
     exportCSV,
   } = useTaxStore();
 
+  const { accounts, syncAllTransactions } = useExchangeStore();
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ trades: number; transfers: number } | null>(null);
+
+  const connectedAccounts = accounts.filter(a => a.isConnected);
+
+  const handleSyncHistory = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      // Sync transactions from the start of the selected year
+      const since = new Date(selectedYear, 0, 1);
+      await syncAllTransactions({ since });
+      setSyncResult({ trades: 0, transfers: 0 }); // Result tracking would need more work
+    } catch (err) {
+      console.error('Failed to sync transactions:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     loadSavedReport();
@@ -95,6 +117,14 @@ export function TaxPage() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={handleSyncHistory}
+            disabled={isSyncing || connectedAccounts.length === 0}
+            className="btn-secondary"
+            title={connectedAccounts.length === 0 ? 'Connect exchanges first' : 'Sync transaction history from exchanges'}
+          >
+            {isSyncing ? 'Syncing...' : 'Sync History'}
+          </button>
+          <button
             onClick={() => calculateTax()}
             disabled={isLoading}
             className="btn-secondary"
@@ -110,6 +140,18 @@ export function TaxPage() {
       {error && (
         <div className="p-4 bg-loss/20 border border-loss/30 rounded-lg text-loss">
           {error}
+        </div>
+      )}
+
+      {syncResult && (
+        <div className="p-4 bg-profit/20 border border-profit/30 rounded-lg text-profit">
+          Transaction history synced successfully. Click "Generate Report" to calculate taxes.
+        </div>
+      )}
+
+      {connectedAccounts.length === 0 && (
+        <div className="p-4 bg-warning/20 border border-warning/30 rounded-lg text-warning">
+          No exchanges connected. Connect exchanges to sync transaction history for tax calculation.
         </div>
       )}
 
