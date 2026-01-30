@@ -217,7 +217,7 @@ export class EVMProvider {
         if (balance && balance.balance.greaterThan(0)) {
           balances.push(balance);
         }
-      } catch (error) {
+      } catch {
         // Skip tokens that fail
       }
     }

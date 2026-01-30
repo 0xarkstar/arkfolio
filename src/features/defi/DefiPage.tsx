@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDefiStore, DefiPosition } from '../../stores/defiStore';
+import { toast } from '../../components/Toast';
 import Decimal from 'decimal.js';
 
 // Mock data for demonstration when no real data exists
@@ -212,10 +213,13 @@ export function DefiPage() {
         chain: formChain,
       });
 
+      toast.success(`Added ${formProtocol} position`);
       setShowAddModal(false);
       resetForm();
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : 'Failed to add position');
+      const message = error instanceof Error ? error.message : 'Failed to add position';
+      setAddError(message);
+      toast.error(message);
     } finally {
       setIsAdding(false);
     }
@@ -224,6 +228,7 @@ export function DefiPage() {
   const handleRemovePosition = async (id: string) => {
     if (confirm('Remove this position?')) {
       await removePosition(id);
+      toast.info('Position removed');
     }
   };
 
@@ -252,10 +257,13 @@ export function DefiPage() {
         lastSync: new Date(),
       });
 
+      toast.success(`Added ${pointsProtocol} points`);
       setShowPointsModal(false);
       resetPointsForm();
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : 'Failed to add points');
+      const message = error instanceof Error ? error.message : 'Failed to add points';
+      setAddError(message);
+      toast.error(message);
     } finally {
       setIsAdding(false);
     }

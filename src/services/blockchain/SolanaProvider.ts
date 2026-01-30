@@ -90,7 +90,7 @@ export class SolanaProvider {
         balance,
         balanceRaw: String(lamports),
       };
-    } catch (error) {
+    } catch {
       // Return zero balance if account not found
       return {
         chain: Chain.SOLANA,
