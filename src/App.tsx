@@ -13,6 +13,7 @@ import { DefiPage } from './features/defi';
 import { RiskPage } from './features/risk';
 import { TaxPage } from './features/tax';
 import { SettingsPage } from './features/settings';
+import { ToastContainer } from './components/Toast';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -72,9 +73,12 @@ function App() {
   }
 
   return (
-    <MainLayout>
-      <PageRouter currentView={currentView} />
-    </MainLayout>
+    <>
+      <MainLayout>
+        <PageRouter currentView={currentView} />
+      </MainLayout>
+      <ToastContainer />
+    </>
   );
 }
 

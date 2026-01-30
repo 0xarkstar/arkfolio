@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useExchangeStore } from '../stores/exchangeStore';
 import { useWalletsStore } from '../stores/walletsStore';
+import { toast } from '../components/Toast';
 
 /**
  * Hook to automatically sync exchanges and wallets based on settings
@@ -58,9 +59,15 @@ export function useAutoSync() {
           promises.push(syncAllWallets());
         }
 
-        await Promise.allSettled(promises);
+        const results = await Promise.allSettled(promises);
+        const hasErrors = results.some(r => r.status === 'rejected');
+
+        if (hasErrors) {
+          toast.warning('Some data failed to sync');
+        }
       } catch (error) {
         console.error('Auto-sync failed:', error);
+        toast.error('Auto-sync failed');
       }
     };
 
