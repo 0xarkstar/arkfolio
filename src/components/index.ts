@@ -31,6 +31,8 @@ export {
   LoadingEmptyState,
 } from './EmptyState';
 export { Tabs, TabPanel, SimpleTabs } from './Tabs';
+export { Card, CardHeader, CardFooter, StatsCard } from './Card';
+export { Avatar, AssetAvatar, AvatarGroup, ChainAvatar } from './Avatar';
 
 // Page components
 export { default as Dashboard } from './Dashboard';
