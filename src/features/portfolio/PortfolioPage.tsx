@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
+import { PortfolioChart } from '../../components/charts';
 
 export function PortfolioPage() {
   const { summary, holdings, allocations, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
@@ -111,30 +112,10 @@ export function PortfolioPage() {
         </div>
       )}
 
-      {/* Performance Chart Placeholder */}
+      {/* Performance Chart */}
       <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-surface-100">Performance</h2>
-          <div className="flex gap-2">
-            {['1D', '1W', '1M', '3M', '1Y', 'ALL'].map((period) => (
-              <button
-                key={period}
-                className={`px-3 py-1 text-sm rounded ${
-                  period === '1M'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-surface-800 text-surface-400 hover:text-surface-100'
-                }`}
-              >
-                {period}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Chart placeholder */}
-        <div className="h-64 bg-surface-800 rounded-lg flex items-center justify-center">
-          <p className="text-surface-500">Chart will be implemented with TradingView Lightweight Charts</p>
-        </div>
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Performance</h2>
+        <PortfolioChart height={300} />
       </div>
 
       {/* Top Holdings */}
