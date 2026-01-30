@@ -6,6 +6,7 @@ import { useWalletsStore } from '../stores/walletsStore';
 import { useDefiStore } from '../stores/defiStore';
 import { priceService } from '../services/price';
 import Decimal from 'decimal.js';
+import { Watchlist } from './Watchlist';
 
 interface MarketPrice {
   symbol: string;
@@ -305,6 +306,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Watchlist */}
+      <Watchlist />
 
       {/* Welcome Banner */}
       {accounts.length === 0 && wallets.length === 0 && (
