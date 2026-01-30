@@ -48,6 +48,9 @@ export {
 } from './Input';
 export { Button, IconButton, ButtonGroup } from './Button';
 export { DataTable, SimpleTable } from './DataTable';
+export { Alert, Banner, InlineAlert } from './Alert';
+export { SearchInput, FilterBar, CommandSearch } from './SearchInput';
+export { Pagination, SimplePagination, LoadMore, usePagination } from './Pagination';
 
 // Page components
 export { default as Dashboard } from './Dashboard';
