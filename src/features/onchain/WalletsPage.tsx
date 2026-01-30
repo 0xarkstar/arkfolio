@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
 import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
 import { toast } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 const SUPPORTED_CHAINS = [
   { id: Chain.ETHEREUM, name: 'Ethereum', icon: 'E' },
@@ -32,6 +33,7 @@ export function WalletsPage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<WalletWithBalances | null>(null);
+  const [walletToRemove, setWalletToRemove] = useState<WalletWithBalances | null>(null);
 
   useEffect(() => {
     loadWallets();
@@ -48,20 +50,29 @@ export function WalletsPage() {
 
     try {
       await addWallet(newWalletAddress, newWalletChain, newWalletLabel);
+      toast.success(`Added wallet ${newWalletLabel || formatAddress(newWalletAddress)}`);
       setIsAddModalOpen(false);
       setNewWalletAddress('');
       setNewWalletLabel('');
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : 'Failed to add wallet');
+      const message = error instanceof Error ? error.message : 'Failed to add wallet';
+      setAddError(message);
+      toast.error(message);
     } finally {
       setIsAdding(false);
     }
   };
 
-  const handleRemoveWallet = async (walletId: string) => {
-    if (confirm('Are you sure you want to remove this wallet?')) {
-      await removeWallet(walletId);
+  const handleRemoveWallet = (wallet: WalletWithBalances) => {
+    setWalletToRemove(wallet);
+  };
+
+  const confirmRemoveWallet = async () => {
+    if (walletToRemove) {
+      await removeWallet(walletToRemove.id);
+      toast.info(`Removed ${walletToRemove.label}`);
       setSelectedWallet(null);
+      setWalletToRemove(null);
     }
   };
 
@@ -228,7 +239,7 @@ export function WalletsPage() {
                 {selectedWallet.isLoading ? 'Syncing...' : 'Refresh'}
               </button>
               <button
-                onClick={() => handleRemoveWallet(selectedWallet.id)}
+                onClick={() => handleRemoveWallet(selectedWallet)}
                 className="px-3 py-1.5 bg-loss/20 hover:bg-loss/30 text-loss rounded text-sm transition-colors"
               >
                 Remove
@@ -444,6 +455,17 @@ export function WalletsPage() {
           </div>
         </div>
       )}
+
+      {/* Remove Wallet Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={!!walletToRemove}
+        title="Remove Wallet"
+        message={`Are you sure you want to remove "${walletToRemove?.label}"? This will delete all tracked balances for this wallet.`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={confirmRemoveWallet}
+        onCancel={() => setWalletToRemove(null)}
+      />
     </div>
   );
 }

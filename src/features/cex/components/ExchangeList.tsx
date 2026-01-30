@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useExchangeStore, ExchangeAccount } from '../../../stores/exchangeStore';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '../../../components/Toast';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface ExchangeListProps {
   onAddExchange: () => void;
@@ -15,6 +16,8 @@ export function ExchangeList({ onAddExchange }: ExchangeListProps) {
     syncExchange,
     removeExchange,
   } = useExchangeStore();
+
+  const [confirmRemove, setConfirmRemove] = useState<ExchangeAccount | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -64,16 +67,27 @@ export function ExchangeList({ onAddExchange }: ExchangeListProps) {
                   toast.error(`Failed to sync ${account.name}`);
                 }
               }}
-              onRemove={async () => {
-                if (confirm(`Remove ${account.name}?`)) {
-                  await removeExchange(account.id);
-                  toast.info(`Removed ${account.name}`);
-                }
-              }}
+              onRemove={() => setConfirmRemove(account)}
             />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmRemove}
+        title="Remove Exchange"
+        message={`Are you sure you want to remove ${confirmRemove?.name}? This will delete all synced data for this exchange.`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={async () => {
+          if (confirmRemove) {
+            await removeExchange(confirmRemove.id);
+            toast.info(`Removed ${confirmRemove.name}`);
+          }
+          setConfirmRemove(null);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </div>
   );
 }
