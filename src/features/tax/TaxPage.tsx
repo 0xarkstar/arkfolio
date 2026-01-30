@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTaxStore } from '../../stores/taxStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
+import { toast } from '../../components/Toast';
 import Decimal from 'decimal.js';
+
+type TxSortField = 'date' | 'type' | 'asset' | 'amount' | 'gainLoss';
+type SortDirection = 'asc' | 'desc';
 
 export function TaxPage() {
   const {
@@ -21,6 +25,9 @@ export function TaxPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ trades: number; transfers: number } | null>(null);
   const [displayLimit, setDisplayLimit] = useState(50);
+  const [sortField, setSortField] = useState<TxSortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [filterType, setFilterType] = useState<string>('all');
 
   const connectedAccounts = accounts.filter(a => a.isConnected);
 
@@ -32,8 +39,10 @@ export function TaxPage() {
       const since = new Date(selectedYear, 0, 1);
       await syncAllTransactions({ since });
       setSyncResult({ trades: 0, transfers: 0 }); // Result tracking would need more work
+      toast.success('Transaction history synced successfully');
     } catch (err) {
       console.error('Failed to sync transactions:', err);
+      toast.error('Failed to sync transaction history');
     } finally {
       setIsSyncing(false);
     }
@@ -54,36 +63,104 @@ export function TaxPage() {
 
   const handleExportCSV = () => {
     const csv = exportCSV();
-    if (!csv) return;
+    if (!csv) {
+      toast.error('No data to export');
+      return;
+    }
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `tax_report_${selectedYear}.csv`;
     link.click();
+    toast.success(`Tax report exported as CSV`);
   };
 
   const handleExportExcel = () => {
     // For now, export as CSV with different extension
     // Full Excel support would require a library like xlsx
     const csv = exportCSV();
-    if (!csv) return;
+    if (!csv) {
+      toast.error('No data to export');
+      return;
+    }
 
     const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `tax_report_${selectedYear}.xlsx`;
     link.click();
+    toast.success(`Tax report exported as Excel`);
   };
 
-  const filteredTransactions = summary?.taxableTransactions.filter((tx) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      tx.asset.toLowerCase().includes(query) ||
-      tx.type.toLowerCase().includes(query)
-    );
-  }) || [];
+  const filteredAndSortedTransactions = useMemo(() => {
+    let filtered = summary?.taxableTransactions || [];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        tx => tx.asset.toLowerCase().includes(query) ||
+              tx.type.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply type filter
+    if (filterType !== 'all') {
+      filtered = filtered.filter(tx => tx.type === filterType);
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'date': {
+          const dateA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+          const dateB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+          comparison = dateA - dateB;
+          break;
+        }
+        case 'type':
+          comparison = a.type.localeCompare(b.type);
+          break;
+        case 'asset':
+          comparison = a.asset.localeCompare(b.asset);
+          break;
+        case 'amount':
+          comparison = a.amount.minus(b.amount).toNumber();
+          break;
+        case 'gainLoss': {
+          const gainA = a.gainLossKrw?.toNumber() || 0;
+          const gainB = b.gainLossKrw?.toNumber() || 0;
+          comparison = gainA - gainB;
+          break;
+        }
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    return sorted;
+  }, [summary?.taxableTransactions, searchQuery, filterType, sortField, sortDirection]);
+
+  const handleSort = (field: TxSortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: TxSortField }) => (
+    <span className={`ml-1 ${sortField === field ? 'text-primary-400' : 'text-surface-600'}`}>
+      {sortField === field ? (sortDirection === 'desc' ? '↓' : '↑') : '↕'}
+    </span>
+  );
+
+  const uniqueTypes = useMemo(() => {
+    const types = summary?.taxableTransactions.map(tx => tx.type) || [];
+    return Array.from(new Set(types)).sort();
+  }, [summary?.taxableTransactions]);
 
   // Use mock data if no real data available
   const displaySummary = summary || {
@@ -249,27 +326,45 @@ export function TaxPage() {
 
       {/* Transaction History */}
       <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h3 className="text-lg font-semibold text-surface-100">
-            Taxable Transactions ({displaySummary.totalTransactions})
+            Taxable Transactions
+            {(searchQuery || filterType !== 'all') &&
+              ` (${filteredAndSortedTransactions.length} of ${displaySummary.totalTransactions})`}
+            {!searchQuery && filterType === 'all' && ` (${displaySummary.totalTransactions})`}
           </h3>
-          <input
-            type="text"
-            placeholder="Search transactions..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setDisplayLimit(50); // Reset pagination on search
-            }}
-            className="input py-1 w-64"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setDisplayLimit(50); // Reset pagination on search
+              }}
+              className="input py-1.5 text-sm w-32"
+            />
+            <select
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setDisplayLimit(50);
+              }}
+              className="input py-1.5 text-sm"
+            >
+              <option value="all">All Types</option>
+              {uniqueTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="text-center py-12">
             <div className="text-surface-400">Calculating tax...</div>
           </div>
-        ) : filteredTransactions.length === 0 ? (
+        ) : displaySummary.totalTransactions === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-4">&#128203;</div>
             <p className="text-surface-400 mb-2">No taxable transactions found</p>
@@ -277,33 +372,61 @@ export function TaxPage() {
               Connect exchanges and sync transactions to calculate taxes.
             </p>
           </div>
+        ) : filteredAndSortedTransactions.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-surface-400 mb-2">No transactions match your filters</p>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setFilterType('all');
+              }}
+              className="text-sm text-primary-400 hover:text-primary-300"
+            >
+              Clear all filters
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-700">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
-                    Date
+                  <th
+                    className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('date')}
+                  >
+                    Date<SortIcon field="date" />
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
-                    Type
+                  <th
+                    className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('type')}
+                  >
+                    Type<SortIcon field="type" />
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">
-                    Asset
+                  <th
+                    className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('asset')}
+                  >
+                    Asset<SortIcon field="asset" />
                   </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
-                    Amount
+                  <th
+                    className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('amount')}
+                  >
+                    Amount<SortIcon field="amount" />
                   </th>
                   <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
                     Price (KRW)
                   </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
-                    Gain/Loss
+                  <th
+                    className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                    onClick={() => handleSort('gainLoss')}
+                  >
+                    Gain/Loss<SortIcon field="gainLoss" />
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.slice(0, displayLimit).map((tx) => (
+                {filteredAndSortedTransactions.slice(0, displayLimit).map((tx) => (
                   <tr
                     key={tx.id}
                     className="border-b border-surface-800 hover:bg-surface-800/50"
@@ -355,13 +478,13 @@ export function TaxPage() {
           </div>
         )}
 
-        {filteredTransactions.length > displayLimit && (
+        {filteredAndSortedTransactions.length > displayLimit && (
           <div className="flex justify-center mt-4">
             <button
               onClick={() => setDisplayLimit((prev) => prev + 50)}
               className="text-sm text-primary-400 hover:text-primary-300"
             >
-              Load More ({filteredTransactions.length - displayLimit} remaining)
+              Load More ({filteredAndSortedTransactions.length - displayLimit} remaining)
             </button>
           </div>
         )}
