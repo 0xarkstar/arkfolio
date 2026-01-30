@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useExchangeStore } from '../stores/exchangeStore';
 import { usePortfolioStore } from '../stores/portfolioStore';
 import { useWalletsStore } from '../stores/walletsStore';
 import { useDefiStore } from '../stores/defiStore';
 import { priceService } from '../services/price';
+import { toast } from './Toast';
 import Decimal from 'decimal.js';
 import { Watchlist } from './Watchlist';
 
@@ -27,13 +28,15 @@ const MARKET_SYMBOLS = [
 export default function Dashboard() {
   const { setView } = useNavigationStore();
   const { accounts, allPositions } = useExchangeStore();
-  const { summary, holdings, refreshPortfolio } = usePortfolioStore();
+  const { summary, holdings, isLoading: portfolioLoading, refreshPortfolio } = usePortfolioStore();
   const { wallets, getTotalValueUsd: getWalletsTotalValue, loadWallets } = useWalletsStore();
   const { positions: defiPositions, getTotalValueUsd: getDefiTotalValue, loadPositions: loadDefiPositions } = useDefiStore();
 
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
   const [pricesLoading, setPricesLoading] = useState(true);
   const [usdKrwRate, setUsdKrwRate] = useState<Decimal>(new Decimal(1350));
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
+  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -43,46 +46,65 @@ export default function Dashboard() {
   }, [refreshPortfolio, loadWallets, loadDefiPositions]);
 
   // Fetch market prices and USD/KRW rate
-  useEffect(() => {
-    async function fetchPrices() {
+  const fetchPrices = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) {
+      setIsRefreshingPrices(true);
+    } else {
       setPricesLoading(true);
-      try {
-        const [prices, krwRate] = await Promise.all([
-          priceService.getPrices(MARKET_SYMBOLS.map(s => s.symbol)),
-          priceService.getUsdKrwRate(),
-        ]);
-
-        setUsdKrwRate(krwRate);
-
-        const priceList: MarketPrice[] = MARKET_SYMBOLS.map(({ symbol, name }) => {
-          const priceData = prices.get(symbol);
-          return {
-            symbol,
-            name,
-            price: priceData?.priceUsd.toNumber() || 0,
-            change24h: priceData?.change24h || 0,
-          };
-        }).filter(p => p.price > 0);
-
-        setMarketPrices(priceList);
-      } catch (error) {
-        console.error('Failed to fetch market prices:', error);
-        // Fallback to cached or default
-        setMarketPrices([
-          { symbol: 'BTC', name: 'Bitcoin', price: 0, change24h: 0 },
-          { symbol: 'ETH', name: 'Ethereum', price: 0, change24h: 0 },
-        ]);
-      } finally {
-        setPricesLoading(false);
-      }
     }
 
+    try {
+      const [prices, krwRate] = await Promise.all([
+        priceService.getPrices(MARKET_SYMBOLS.map(s => s.symbol)),
+        priceService.getUsdKrwRate(),
+      ]);
+
+      setUsdKrwRate(krwRate);
+
+      const priceList: MarketPrice[] = MARKET_SYMBOLS.map(({ symbol, name }) => {
+        const priceData = prices.get(symbol);
+        return {
+          symbol,
+          name,
+          price: priceData?.priceUsd.toNumber() || 0,
+          change24h: priceData?.change24h || 0,
+        };
+      }).filter(p => p.price > 0);
+
+      setMarketPrices(priceList);
+      setLastPriceUpdate(new Date());
+
+      if (isManualRefresh) {
+        toast.success('Market prices updated');
+      }
+    } catch (error) {
+      console.error('Failed to fetch market prices:', error);
+      if (isManualRefresh) {
+        toast.error('Failed to refresh prices');
+      }
+      // Fallback to cached or default
+      setMarketPrices(prev => {
+        if (prev.length === 0) {
+          return [
+            { symbol: 'BTC', name: 'Bitcoin', price: 0, change24h: 0 },
+            { symbol: 'ETH', name: 'Ethereum', price: 0, change24h: 0 },
+          ];
+        }
+        return prev;
+      });
+    } finally {
+      setPricesLoading(false);
+      setIsRefreshingPrices(false);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchPrices();
 
     // Refresh prices every 60 seconds
-    const interval = setInterval(fetchPrices, 60000);
+    const interval = setInterval(() => fetchPrices(), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchPrices]);
 
   const connectedExchanges = accounts.filter(a => a.isConnected).length;
   const totalPositions = Array.from(allPositions.values()).reduce(
@@ -106,30 +128,44 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
-          title="Total Portfolio Value"
-          value={formatCurrency(totalPortfolioValue.toNumber())}
-          subtitle={`${formatKrw(totalPortfolioValue.times(usdKrwRate).toNumber())}`}
-          onClick={() => setView('portfolio')}
-        />
-        <SummaryCard
-          title="24h Change"
-          value={formatCurrency(summary.change24hUsd.toNumber())}
-          subtitle={`${summary.change24hPercent >= 0 ? '+' : ''}${summary.change24hPercent.toFixed(2)}%`}
-          trend={summary.change24hPercent >= 0 ? 'profit' : 'loss'}
-        />
-        <SummaryCard
-          title="CEX Assets"
-          value={holdings.length > 0 ? formatCurrency(cexValue.toNumber()) : '$0.00'}
-          subtitle={`${connectedExchanges} exchange${connectedExchanges !== 1 ? 's' : ''}`}
-          onClick={() => setView('exchanges')}
-        />
-        <SummaryCard
-          title="On-chain + DeFi"
-          value={formatCurrency(walletsValue.plus(defiValue).toNumber())}
-          subtitle={`${wallets.length} wallet${wallets.length !== 1 ? 's' : ''}, ${defiPositions.length} positions`}
-          onClick={() => setView('wallets')}
-        />
+        {portfolioLoading && holdings.length === 0 ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="card p-4 animate-pulse">
+                <div className="h-4 w-28 bg-surface-700 rounded mb-2" />
+                <div className="h-7 w-32 bg-surface-600 rounded mb-2" />
+                <div className="h-4 w-24 bg-surface-700 rounded" />
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <SummaryCard
+              title="Total Portfolio Value"
+              value={formatCurrency(totalPortfolioValue.toNumber())}
+              subtitle={`${formatKrw(totalPortfolioValue.times(usdKrwRate).toNumber())}`}
+              onClick={() => setView('portfolio')}
+            />
+            <SummaryCard
+              title="24h Change"
+              value={formatCurrency(summary.change24hUsd.toNumber())}
+              subtitle={`${summary.change24hPercent >= 0 ? '+' : ''}${summary.change24hPercent.toFixed(2)}%`}
+              trend={summary.change24hPercent >= 0 ? 'profit' : 'loss'}
+            />
+            <SummaryCard
+              title="CEX Assets"
+              value={holdings.length > 0 ? formatCurrency(cexValue.toNumber()) : '$0.00'}
+              subtitle={`${connectedExchanges} exchange${connectedExchanges !== 1 ? 's' : ''}`}
+              onClick={() => setView('exchanges')}
+            />
+            <SummaryCard
+              title="On-chain + DeFi"
+              value={formatCurrency(walletsValue.plus(defiValue).toNumber())}
+              subtitle={`${wallets.length} wallet${wallets.length !== 1 ? 's' : ''}, ${defiPositions.length} positions`}
+              onClick={() => setView('wallets')}
+            />
+          </>
+        )}
       </div>
 
       {/* Risk Alert Banner */}
@@ -216,7 +252,23 @@ export default function Dashboard() {
 
         {/* Market Overview */}
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-surface-100 mb-4">Market Overview</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-100">Market Overview</h2>
+            <div className="flex items-center gap-3">
+              {lastPriceUpdate && (
+                <span className="text-xs text-surface-500">
+                  Updated {lastPriceUpdate.toLocaleTimeString()}
+                </span>
+              )}
+              <button
+                onClick={() => fetchPrices(true)}
+                disabled={isRefreshingPrices || pricesLoading}
+                className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+              >
+                {isRefreshingPrices ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
           {pricesLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
