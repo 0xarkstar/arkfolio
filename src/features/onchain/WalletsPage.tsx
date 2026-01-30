@@ -1,56 +1,87 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
+import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
 
-interface Wallet {
-  id: string;
-  address: string;
-  chain: string;
-  label: string;
-  balance: number;
-  tokens: number;
-}
-
-const mockWallets: Wallet[] = [
-  {
-    id: '1',
-    address: '0x1234...5678',
-    chain: 'Ethereum',
-    label: 'Main Wallet',
-    balance: 45230,
-    tokens: 12,
-  },
-  {
-    id: '2',
-    address: '0xabcd...efgh',
-    chain: 'Arbitrum',
-    label: 'DeFi Wallet',
-    balance: 18500,
-    tokens: 8,
-  },
-  {
-    id: '3',
-    address: '7nYB...x9Kp',
-    chain: 'Solana',
-    label: 'Solana Wallet',
-    balance: 5200,
-    tokens: 5,
-  },
-];
-
-const supportedChains = [
-  { id: 'ethereum', name: 'Ethereum', icon: 'E' },
-  { id: 'arbitrum', name: 'Arbitrum', icon: 'A' },
-  { id: 'optimism', name: 'Optimism', icon: 'O' },
-  { id: 'base', name: 'Base', icon: 'B' },
-  { id: 'polygon', name: 'Polygon', icon: 'P' },
-  { id: 'bsc', name: 'BSC', icon: 'B' },
-  { id: 'solana', name: 'Solana', icon: 'S' },
+const SUPPORTED_CHAINS = [
+  { id: Chain.ETHEREUM, name: 'Ethereum', icon: 'E' },
+  { id: Chain.ARBITRUM, name: 'Arbitrum', icon: 'A' },
+  { id: Chain.OPTIMISM, name: 'Optimism', icon: 'O' },
+  { id: Chain.BASE, name: 'Base', icon: 'B' },
+  { id: Chain.POLYGON, name: 'Polygon', icon: 'P' },
+  { id: Chain.BSC, name: 'BSC', icon: 'B' },
+  { id: Chain.AVALANCHE, name: 'Avalanche', icon: 'A' },
 ];
 
 export function WalletsPage() {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [wallets] = useState<Wallet[]>(mockWallets);
+  const {
+    wallets,
+    isLoading,
+    loadWallets,
+    addWallet,
+    removeWallet,
+    syncWallet,
+    getTotalValueUsd,
+  } = useWalletsStore();
 
-  const totalValue = wallets.reduce((sum, w) => sum + w.balance, 0);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newWalletChain, setNewWalletChain] = useState<Chain>(Chain.ETHEREUM);
+  const [newWalletAddress, setNewWalletAddress] = useState('');
+  const [newWalletLabel, setNewWalletLabel] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<WalletWithBalances | null>(null);
+
+  useEffect(() => {
+    loadWallets();
+  }, [loadWallets]);
+
+  const totalValue = getTotalValueUsd();
+  const uniqueChains = new Set(wallets.map((w) => w.chain)).size;
+  const totalTokens = wallets.reduce((sum, w) => sum + w.tokenBalances.length, 0);
+
+  const handleAddWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    setIsAdding(true);
+
+    try {
+      await addWallet(newWalletAddress, newWalletChain, newWalletLabel);
+      setIsAddModalOpen(false);
+      setNewWalletAddress('');
+      setNewWalletLabel('');
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'Failed to add wallet');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleRemoveWallet = async (walletId: string) => {
+    if (confirm('Are you sure you want to remove this wallet?')) {
+      await removeWallet(walletId);
+      setSelectedWallet(null);
+    }
+  };
+
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const formatBalance = (value: number) => {
+    if (value >= 1000) return value.toFixed(2);
+    if (value >= 1) return value.toFixed(4);
+    if (value >= 0.0001) return value.toFixed(6);
+    return value.toFixed(8);
+  };
 
   return (
     <div className="space-y-6">
@@ -59,7 +90,7 @@ export function WalletsPage() {
         <div className="card p-4">
           <p className="text-sm text-surface-400">Total On-chain Value</p>
           <p className="text-2xl font-bold text-surface-100 font-tabular">
-            ${totalValue.toLocaleString()}
+            {formatCurrency(totalValue.toNumber())}
           </p>
         </div>
         <div className="card p-4">
@@ -68,15 +99,11 @@ export function WalletsPage() {
         </div>
         <div className="card p-4">
           <p className="text-sm text-surface-400">Chains</p>
-          <p className="text-2xl font-bold text-surface-100">
-            {new Set(wallets.map(w => w.chain)).size}
-          </p>
+          <p className="text-2xl font-bold text-surface-100">{uniqueChains}</p>
         </div>
         <div className="card p-4">
           <p className="text-sm text-surface-400">Total Tokens</p>
-          <p className="text-2xl font-bold text-surface-100">
-            {wallets.reduce((sum, w) => sum + w.tokens, 0)}
-          </p>
+          <p className="text-2xl font-bold text-surface-100">{totalTokens}</p>
         </div>
       </div>
 
@@ -89,9 +116,13 @@ export function WalletsPage() {
           </button>
         </div>
 
-        {wallets.length === 0 ? (
+        {isLoading && wallets.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-4xl mb-4">👛</div>
+            <div className="text-surface-400">Loading wallets...</div>
+          </div>
+        ) : wallets.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-4xl mb-4">&#128091;</div>
             <p className="text-surface-400 mb-4">No wallets connected</p>
             <button onClick={() => setIsAddModalOpen(true)} className="btn-secondary">
               Add Your First Wallet
@@ -102,25 +133,42 @@ export function WalletsPage() {
             {wallets.map((wallet) => (
               <div
                 key={wallet.id}
-                className="flex items-center justify-between p-4 bg-surface-800 rounded-lg hover:bg-surface-750 transition-colors"
+                onClick={() => setSelectedWallet(wallet)}
+                className={`flex items-center justify-between p-4 rounded-lg cursor-pointer transition-colors ${
+                  selectedWallet?.id === wallet.id
+                    ? 'bg-primary-600/20 border border-primary-600'
+                    : 'bg-surface-800 hover:bg-surface-750'
+                }`}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-primary-400 font-medium">
-                    {wallet.chain[0]}
+                    {CHAIN_CONFIGS[wallet.chain]?.name[0] || wallet.chain[0].toUpperCase()}
                   </div>
                   <div>
                     <p className="font-medium text-surface-100">{wallet.label}</p>
-                    <p className="text-sm text-surface-400">{wallet.address}</p>
+                    <p className="text-sm text-surface-400 font-mono">
+                      {formatAddress(wallet.address)}
+                    </p>
                   </div>
                   <span className="px-2 py-0.5 bg-surface-700 rounded text-xs text-surface-300">
-                    {wallet.chain}
+                    {CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain}
                   </span>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium text-surface-100 font-tabular">
-                    ${wallet.balance.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-surface-400">{wallet.tokens} tokens</p>
+                  {wallet.isLoading ? (
+                    <p className="text-surface-400 text-sm">Syncing...</p>
+                  ) : wallet.error ? (
+                    <p className="text-loss text-sm">{wallet.error}</p>
+                  ) : (
+                    <>
+                      <p className="font-medium text-surface-100 font-tabular">
+                        {formatCurrency(wallet.totalValueUsd.toNumber())}
+                      </p>
+                      <p className="text-sm text-surface-400">
+                        {wallet.tokenBalances.length + (wallet.nativeBalance ? 1 : 0)} assets
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -128,11 +176,111 @@ export function WalletsPage() {
         )}
       </div>
 
+      {/* Selected Wallet Details */}
+      {selectedWallet && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-100">
+              {selectedWallet.label} Details
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => syncWallet(selectedWallet.id)}
+                disabled={selectedWallet.isLoading}
+                className="btn-secondary text-sm"
+              >
+                {selectedWallet.isLoading ? 'Syncing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => handleRemoveWallet(selectedWallet.id)}
+                className="px-3 py-1.5 bg-loss/20 hover:bg-loss/30 text-loss rounded text-sm transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-sm text-surface-400">Address</p>
+            <p className="font-mono text-surface-200">{selectedWallet.address}</p>
+          </div>
+
+          {/* Native Balance */}
+          {selectedWallet.nativeBalance &&
+            selectedWallet.nativeBalance.balance.greaterThan(0) && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-surface-300 mb-2">Native Balance</h3>
+                <div className="flex items-center justify-between p-3 bg-surface-800 rounded">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
+                      {selectedWallet.nativeBalance.symbol.slice(0, 2)}
+                    </div>
+                    <span className="font-medium text-surface-100">
+                      {selectedWallet.nativeBalance.symbol}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-surface-100 font-tabular">
+                      {formatBalance(selectedWallet.nativeBalance.balance.toNumber())}
+                    </p>
+                    {selectedWallet.nativeBalance.valueUsd && (
+                      <p className="text-sm text-surface-400 font-tabular">
+                        {formatCurrency(selectedWallet.nativeBalance.valueUsd.toNumber())}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Token Balances */}
+          {selectedWallet.tokenBalances.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-surface-300 mb-2">Tokens</h3>
+              <div className="space-y-2">
+                {selectedWallet.tokenBalances.map((token, index) => (
+                  <div
+                    key={`${token.token.address}-${index}`}
+                    className="flex items-center justify-between p-3 bg-surface-800 rounded"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
+                        {token.token.symbol.slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-surface-100">{token.token.symbol}</p>
+                        <p className="text-xs text-surface-500">{token.token.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-surface-100 font-tabular">
+                        {formatBalance(token.balance.toNumber())}
+                      </p>
+                      {token.valueUsd && (
+                        <p className="text-sm text-surface-400 font-tabular">
+                          {formatCurrency(token.valueUsd.toNumber())}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!selectedWallet.isLoading &&
+            !selectedWallet.nativeBalance &&
+            selectedWallet.tokenBalances.length === 0 && (
+              <p className="text-surface-400 text-center py-4">No assets found</p>
+            )}
+        </div>
+      )}
+
       {/* Supported Chains */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Supported Chains</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          {supportedChains.map((chain) => (
+          {SUPPORTED_CHAINS.map((chain) => (
             <div
               key={chain.id}
               className="flex flex-col items-center p-4 bg-surface-800 rounded-lg"
@@ -153,20 +301,33 @@ export function WalletsPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-surface-100">Add Wallet</h2>
               <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-surface-400 hover:text-surface-100"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setAddError(null);
+                }}
+                className="text-surface-400 hover:text-surface-100 text-2xl"
               >
                 &times;
               </button>
             </div>
 
-            <form className="space-y-4">
+            {addError && (
+              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
+                {addError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddWallet} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-1">
                   Chain
                 </label>
-                <select className="input w-full">
-                  {supportedChains.map((chain) => (
+                <select
+                  value={newWalletChain}
+                  onChange={(e) => setNewWalletChain(e.target.value as Chain)}
+                  className="input w-full"
+                >
+                  {SUPPORTED_CHAINS.map((chain) => (
                     <option key={chain.id} value={chain.id}>
                       {chain.name}
                     </option>
@@ -180,8 +341,11 @@ export function WalletsPage() {
                 </label>
                 <input
                   type="text"
+                  value={newWalletAddress}
+                  onChange={(e) => setNewWalletAddress(e.target.value)}
                   className="input w-full font-mono"
-                  placeholder="0x... or ENS name"
+                  placeholder="0x..."
+                  required
                 />
               </div>
 
@@ -191,6 +355,8 @@ export function WalletsPage() {
                 </label>
                 <input
                   type="text"
+                  value={newWalletLabel}
+                  onChange={(e) => setNewWalletLabel(e.target.value)}
                   className="input w-full"
                   placeholder="My Main Wallet"
                 />
@@ -199,13 +365,21 @@ export function WalletsPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setAddError(null);
+                  }}
                   className="btn-secondary flex-1"
+                  disabled={isAdding}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Add Wallet
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={isAdding || !newWalletAddress}
+                >
+                  {isAdding ? 'Adding...' : 'Add Wallet'}
                 </button>
               </div>
             </form>
