@@ -42,14 +42,6 @@ interface EtherscanNormalTx {
   functionName: string;
 }
 
-interface EtherscanTokenBalance {
-  TokenAddress: string;
-  TokenName: string;
-  TokenSymbol: string;
-  TokenDecimal: string;
-  TokenQuantity: string;
-}
-
 /**
  * EVM Provider for fetching on-chain data from EVM-compatible chains
  * Uses block explorer APIs (Etherscan-like) for token balances and transactions
