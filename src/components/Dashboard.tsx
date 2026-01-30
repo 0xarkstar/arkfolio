@@ -32,6 +32,7 @@ export default function Dashboard() {
 
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
   const [pricesLoading, setPricesLoading] = useState(true);
+  const [usdKrwRate, setUsdKrwRate] = useState<Decimal>(new Decimal(1350));
 
   // Load data on mount
   useEffect(() => {
@@ -40,13 +41,17 @@ export default function Dashboard() {
     loadDefiPositions();
   }, [refreshPortfolio, loadWallets, loadDefiPositions]);
 
-  // Fetch market prices
+  // Fetch market prices and USD/KRW rate
   useEffect(() => {
     async function fetchPrices() {
       setPricesLoading(true);
       try {
-        const symbols = MARKET_SYMBOLS.map(s => s.symbol);
-        const prices = await priceService.getPrices(symbols);
+        const [prices, krwRate] = await Promise.all([
+          priceService.getPrices(MARKET_SYMBOLS.map(s => s.symbol)),
+          priceService.getUsdKrwRate(),
+        ]);
+
+        setUsdKrwRate(krwRate);
 
         const priceList: MarketPrice[] = MARKET_SYMBOLS.map(({ symbol, name }) => {
           const priceData = prices.get(symbol);
@@ -103,7 +108,7 @@ export default function Dashboard() {
         <SummaryCard
           title="Total Portfolio Value"
           value={formatCurrency(totalPortfolioValue.toNumber())}
-          subtitle="All assets combined"
+          subtitle={`${formatKrw(totalPortfolioValue.times(usdKrwRate).toNumber())}`}
           onClick={() => setView('portfolio')}
         />
         <SummaryCard
@@ -414,6 +419,14 @@ function formatCurrency(value: number): string {
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatKrw(value: number): string {
+  return new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
