@@ -5,6 +5,7 @@ import { useExchangeStore } from '../../stores/exchangeStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWalletsStore } from '../../stores/walletsStore';
 import { GlobalSearch } from '../GlobalSearch';
+import { toast } from '../Toast';
 
 const viewTitles: Record<ViewId, string> = {
   dashboard: 'Dashboard',
@@ -44,9 +45,17 @@ export default function Header() {
       if (wallets.length > 0) {
         promises.push(syncAllWallets());
       }
-      await Promise.allSettled(promises);
+      const results = await Promise.allSettled(promises);
+      const hasErrors = results.some(r => r.status === 'rejected');
+
+      if (hasErrors) {
+        toast.warning('Some data failed to sync');
+      } else {
+        toast.success('All data synced successfully');
+      }
     } catch (error) {
       console.error('Sync failed:', error);
+      toast.error('Sync failed');
     } finally {
       setIsSyncing(false);
     }
