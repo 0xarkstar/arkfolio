@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useExchangeStore } from '../stores/exchangeStore';
 import { usePortfolioStore } from '../stores/portfolioStore';
 import { useWalletsStore } from '../stores/walletsStore';
 import { useDefiStore } from '../stores/defiStore';
+import { priceService } from '../services/price';
 import Decimal from 'decimal.js';
 
 interface MarketPrice {
@@ -13,6 +14,15 @@ interface MarketPrice {
   change24h: number;
 }
 
+const MARKET_SYMBOLS = [
+  { symbol: 'BTC', name: 'Bitcoin' },
+  { symbol: 'ETH', name: 'Ethereum' },
+  { symbol: 'SOL', name: 'Solana' },
+  { symbol: 'BNB', name: 'BNB' },
+  { symbol: 'XRP', name: 'XRP' },
+  { symbol: 'ADA', name: 'Cardano' },
+];
+
 export default function Dashboard() {
   const { setView } = useNavigationStore();
   const { accounts, allPositions } = useExchangeStore();
@@ -20,12 +30,53 @@ export default function Dashboard() {
   const { wallets, getTotalValueUsd: getWalletsTotalValue, loadWallets } = useWalletsStore();
   const { positions: defiPositions, getTotalValueUsd: getDefiTotalValue, loadPositions: loadDefiPositions } = useDefiStore();
 
+  const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
+  const [pricesLoading, setPricesLoading] = useState(true);
+
   // Load data on mount
   useEffect(() => {
     refreshPortfolio();
     loadWallets();
     loadDefiPositions();
   }, [refreshPortfolio, loadWallets, loadDefiPositions]);
+
+  // Fetch market prices
+  useEffect(() => {
+    async function fetchPrices() {
+      setPricesLoading(true);
+      try {
+        const symbols = MARKET_SYMBOLS.map(s => s.symbol);
+        const prices = await priceService.getPrices(symbols);
+
+        const priceList: MarketPrice[] = MARKET_SYMBOLS.map(({ symbol, name }) => {
+          const priceData = prices.get(symbol);
+          return {
+            symbol,
+            name,
+            price: priceData?.priceUsd.toNumber() || 0,
+            change24h: priceData?.change24h || 0,
+          };
+        }).filter(p => p.price > 0);
+
+        setMarketPrices(priceList);
+      } catch (error) {
+        console.error('Failed to fetch market prices:', error);
+        // Fallback to cached or default
+        setMarketPrices([
+          { symbol: 'BTC', name: 'Bitcoin', price: 0, change24h: 0 },
+          { symbol: 'ETH', name: 'Ethereum', price: 0, change24h: 0 },
+        ]);
+      } finally {
+        setPricesLoading(false);
+      }
+    }
+
+    fetchPrices();
+
+    // Refresh prices every 60 seconds
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const connectedExchanges = accounts.filter(a => a.isConnected).length;
   const totalPositions = Array.from(allPositions.values()).reduce(
@@ -38,14 +89,6 @@ export default function Dashboard() {
   const walletsValue = getWalletsTotalValue();
   const defiValue = getDefiTotalValue();
   const totalPortfolioValue = cexValue.plus(walletsValue).plus(defiValue);
-
-  // Mock market data (would be fetched from price service in production)
-  const marketPrices: MarketPrice[] = [
-    { symbol: 'BTC', name: 'Bitcoin', price: 67234.56, change24h: 2.34 },
-    { symbol: 'ETH', name: 'Ethereum', price: 3456.78, change24h: -1.23 },
-    { symbol: 'SOL', name: 'Solana', price: 123.45, change24h: 5.67 },
-    { symbol: 'BNB', name: 'BNB', price: 567.89, change24h: 0.45 },
-  ];
 
   // Calculate risk metrics
   const hasOpenPositions = totalPositions > 0;
@@ -168,32 +211,52 @@ export default function Dashboard() {
         {/* Market Overview */}
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Market Overview</h2>
-          <div className="space-y-3">
-            {marketPrices.map((coin) => (
-              <div
-                key={coin.symbol}
-                className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium text-primary-400">
-                    {coin.symbol.slice(0, 2)}
+          {pricesLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0 animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-surface-700 rounded-full" />
+                    <div>
+                      <div className="h-4 w-12 bg-surface-700 rounded" />
+                      <div className="h-3 w-16 bg-surface-800 rounded mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-surface-100">{coin.symbol}</p>
-                    <p className="text-xs text-surface-400">{coin.name}</p>
+                  <div className="text-right">
+                    <div className="h-4 w-20 bg-surface-700 rounded" />
+                    <div className="h-3 w-10 bg-surface-800 rounded mt-1" />
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-surface-100 font-tabular">
-                    ${coin.price.toLocaleString()}
-                  </p>
-                  <p className={`text-xs font-tabular ${coin.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {coin.change24h >= 0 ? '+' : ''}{coin.change24h}%
-                  </p>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {marketPrices.map((coin) => (
+                <div
+                  key={coin.symbol}
+                  className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium text-primary-400">
+                      {coin.symbol.slice(0, 2)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-surface-100">{coin.symbol}</p>
+                      <p className="text-xs text-surface-400">{coin.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-surface-100 font-tabular">
+                      ${coin.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className={`text-xs font-tabular ${coin.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {coin.change24h >= 0 ? '+' : ''}{coin.change24h.toFixed(2)}%
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
