@@ -87,8 +87,20 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Footer */}
       <div className="p-4 border-t border-surface-800">
-        {!collapsed && (
-          <p className="text-xs text-surface-500 text-center">v0.1.0</p>
+        {!collapsed ? (
+          <div className="text-center">
+            <p className="text-xs text-surface-500">v0.1.0</p>
+            <p className="text-xs text-surface-600 mt-1">
+              Press <kbd className="px-1 py-0.5 bg-surface-700 rounded text-[10px]">?</kbd> for shortcuts
+            </p>
+          </div>
+        ) : (
+          <button
+            className="w-full flex justify-center text-surface-600 hover:text-surface-400"
+            title="Keyboard shortcuts (?)"
+          >
+            <kbd className="px-1.5 py-0.5 bg-surface-700 rounded text-xs">?</kbd>
+          </button>
         )}
       </div>
     </aside>
