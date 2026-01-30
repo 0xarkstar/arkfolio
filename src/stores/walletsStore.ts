@@ -85,7 +85,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
 
     try {
       // Validate address
-      if (!walletService.isValidEVMAddress(address)) {
+      if (!walletService.isValidAddress(address, chain)) {
         throw new Error('Invalid wallet address');
       }
 

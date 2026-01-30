@@ -7,6 +7,7 @@ import {
   OnchainTransaction,
 } from './types';
 import { EVMProvider } from './EVMProvider';
+import { SolanaProvider } from './SolanaProvider';
 import { CHAIN_CONFIGS, getEVMChains } from './chains';
 import { priceService } from '../price';
 
@@ -21,10 +22,12 @@ interface WalletServiceConfig {
 class WalletService {
   private static instance: WalletService;
   private providers: Map<Chain, EVMProvider> = new Map();
+  private solanaProvider: SolanaProvider;
   private config: WalletServiceConfig;
 
   private constructor(config: WalletServiceConfig = {}) {
     this.config = config;
+    this.solanaProvider = new SolanaProvider();
     this.initializeProviders();
   }
 
@@ -37,7 +40,7 @@ class WalletService {
 
   private initializeProviders(): void {
     const evmChains = getEVMChains();
-    const enabledChains = this.config.enabledChains || evmChains.map((c) => c.id);
+    const enabledChains = this.config.enabledChains || [...evmChains.map((c) => c.id), Chain.SOLANA];
 
     for (const chainConfig of evmChains) {
       if (!enabledChains.includes(chainConfig.id)) continue;
@@ -71,16 +74,37 @@ class WalletService {
   }
 
   /**
+   * Check if address is valid Solana address
+   */
+  isValidSolanaAddress(address: string): boolean {
+    return this.solanaProvider.isValidAddress(address);
+  }
+
+  /**
+   * Check if address is valid for the given chain
+   */
+  isValidAddress(address: string, chain: Chain): boolean {
+    if (chain === Chain.SOLANA) {
+      return this.isValidSolanaAddress(address);
+    }
+    return this.isValidEVMAddress(address);
+  }
+
+  /**
    * Get native balance for a single chain
    */
   async getNativeBalance(chain: Chain, address: string): Promise<NativeBalance | null> {
-    const provider = this.providers.get(chain);
-    if (!provider) {
-      console.warn(`No provider for chain ${chain}`);
-      return null;
-    }
-
     try {
+      if (chain === Chain.SOLANA) {
+        return await this.solanaProvider.getNativeBalance(address);
+      }
+
+      const provider = this.providers.get(chain);
+      if (!provider) {
+        console.warn(`No provider for chain ${chain}`);
+        return null;
+      }
+
       return await provider.getNativeBalance(address);
     } catch (error) {
       console.error(`Failed to fetch native balance for ${chain}:`, error);
@@ -96,13 +120,17 @@ class WalletService {
     address: string,
     useCommonOnly: boolean = false
   ): Promise<TokenBalance[]> {
-    const provider = this.providers.get(chain);
-    if (!provider) {
-      console.warn(`No provider for chain ${chain}`);
-      return [];
-    }
-
     try {
+      if (chain === Chain.SOLANA) {
+        return await this.solanaProvider.getTokenBalances(address);
+      }
+
+      const provider = this.providers.get(chain);
+      if (!provider) {
+        console.warn(`No provider for chain ${chain}`);
+        return [];
+      }
+
       if (useCommonOnly) {
         return await provider.getCommonTokenBalances(address);
       }
@@ -242,7 +270,7 @@ class WalletService {
    * Get list of supported chains
    */
   getSupportedChains(): Chain[] {
-    return Array.from(this.providers.keys());
+    return [...Array.from(this.providers.keys()), Chain.SOLANA];
   }
 }
 
