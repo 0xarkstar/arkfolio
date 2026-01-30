@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Modal } from './Modal';
 
 interface Shortcut {
   keys: string[];
@@ -49,58 +50,38 @@ export function KeyboardShortcuts() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
-        className="card w-full max-w-md p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-surface-100">
-            Keyboard Shortcuts
-          </h2>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="text-surface-400 hover:text-surface-100 text-xl"
+    <Modal
+      isOpen={isOpen}
+      onClose={() => setIsOpen(false)}
+      title="Keyboard Shortcuts"
+      size="md"
+    >
+      <div className="space-y-3">
+        {shortcuts.map((shortcut, index) => (
+          <div
+            key={index}
+            className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
           >
-            &times;
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          {shortcuts.map((shortcut, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
-            >
-              <span className="text-surface-300">{shortcut.description}</span>
-              <div className="flex gap-1">
-                {shortcut.keys.map((key, keyIndex) => (
-                  <kbd
-                    key={keyIndex}
-                    className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-200 font-mono min-w-[24px] text-center"
-                  >
-                    {key}
-                  </kbd>
-                ))}
-              </div>
+            <span className="text-surface-300">{shortcut.description}</span>
+            <div className="flex gap-1">
+              {shortcut.keys.map((key, keyIndex) => (
+                <kbd
+                  key={keyIndex}
+                  className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-200 font-mono min-w-[24px] text-center"
+                >
+                  {key}
+                </kbd>
+              ))}
             </div>
-          ))}
-        </div>
-
-        <p className="text-xs text-surface-500 mt-4 text-center">
-          Press <kbd className="px-1.5 py-0.5 bg-surface-700 rounded text-xs">Esc</kbd> to close
-        </p>
+          </div>
+        ))}
       </div>
-      <div
-        className="absolute inset-0 -z-10"
-        onClick={() => setIsOpen(false)}
-      />
-    </div>
+
+      <p className="text-xs text-surface-500 mt-4 text-center">
+        Press <kbd className="px-1.5 py-0.5 bg-surface-700 rounded text-xs">Esc</kbd> to close
+      </p>
+    </Modal>
   );
 }
 

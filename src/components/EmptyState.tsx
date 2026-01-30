@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Button } from './Button';
 
 interface EmptyStateProps {
   icon?: ReactNode;
@@ -40,20 +41,21 @@ export function EmptyState({
       {(action || secondaryAction) && (
         <div className="flex items-center justify-center gap-3">
           {action && (
-            <button
+            <Button
               onClick={action.onClick}
-              className={action.variant === 'secondary' ? 'btn-secondary' : 'btn-primary'}
+              variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
             >
               {action.label}
-            </button>
+            </Button>
           )}
           {secondaryAction && (
-            <button
+            <Button
               onClick={secondaryAction.onClick}
-              className="text-sm text-primary-400 hover:text-primary-300"
+              variant="ghost"
+              size="sm"
             >
               {secondaryAction.label}
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -16,6 +16,8 @@ import { SettingsPage } from './features/settings';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KeyboardShortcuts, useKeyboardNavigation } from './components/KeyboardShortcuts';
+import { Card } from './components/Card';
+import { Button } from './components/Button';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -62,17 +64,17 @@ function App() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface-950">
-        <div className="card p-6 max-w-md text-center">
+        <Card className="p-6 max-w-md text-center">
           <div className="text-loss text-4xl mb-4">!</div>
           <h1 className="text-xl font-semibold text-surface-100 mb-2">Initialization Error</h1>
           <p className="text-surface-400 mb-4">{error}</p>
-          <button
+          <Button
             onClick={() => window.location.reload()}
-            className="btn-primary"
+            variant="primary"
           >
             Retry
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
     );
   }

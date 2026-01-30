@@ -1,4 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { Card } from './Card';
+import { Button } from './Button';
 
 interface Props {
   children: ReactNode;
@@ -42,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex items-center justify-center min-h-[400px] p-8">
-          <div className="card p-8 max-w-lg text-center">
+          <Card className="p-8 max-w-lg text-center">
             <div className="text-4xl mb-4 text-loss">!</div>
             <h2 className="text-xl font-semibold text-surface-100 mb-2">
               Something went wrong
@@ -66,14 +68,14 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
 
             <div className="flex gap-3 justify-center">
-              <button onClick={this.handleReset} className="btn-secondary">
+              <Button onClick={this.handleReset} variant="secondary">
                 Try Again
-              </button>
-              <button onClick={this.handleReload} className="btn-primary">
+              </Button>
+              <Button onClick={this.handleReload} variant="primary">
                 Reload Page
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       );
     }
