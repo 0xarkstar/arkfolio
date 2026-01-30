@@ -1,22 +1,18 @@
+import { useEffect } from 'react';
+import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 
 export function PortfolioPage() {
-  const { getAggregatedBalances, allPositions } = useExchangeStore();
-  const balances = getAggregatedBalances();
+  const { summary, holdings, allocations, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
+  const { accounts } = useExchangeStore();
 
-  // Mock data for portfolio overview
-  const portfolioSummary = {
-    totalValue: 125432.56,
-    change24h: 2341.23,
-    changePercent: 1.9,
-  };
+  // Refresh portfolio on mount and when accounts change
+  useEffect(() => {
+    refreshPortfolio();
+  }, [refreshPortfolio, accounts.length]);
 
-  const assetAllocation = [
-    { name: 'Bitcoin', symbol: 'BTC', value: 52000, percent: 41.5, color: 'bg-orange-500' },
-    { name: 'Ethereum', symbol: 'ETH', value: 35000, percent: 27.9, color: 'bg-blue-500' },
-    { name: 'Stablecoins', symbol: 'USD', value: 25000, percent: 19.9, color: 'bg-green-500' },
-    { name: 'Others', symbol: 'ALT', value: 13432, percent: 10.7, color: 'bg-purple-500' },
-  ];
+  const hasData = holdings.length > 0;
+  const connectedExchanges = accounts.filter(a => a.isConnected).length;
 
   return (
     <div className="space-y-6">
@@ -27,16 +23,26 @@ export function PortfolioPage() {
             <div>
               <p className="text-sm text-surface-400 mb-1">Total Portfolio Value</p>
               <p className="text-4xl font-bold text-surface-100 font-tabular">
-                ${portfolioSummary.totalValue.toLocaleString()}
+                {formatCurrency(summary.totalValueUsd.toNumber())}
               </p>
-              <p className={`text-sm mt-2 ${portfolioSummary.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {portfolioSummary.change24h >= 0 ? '+' : ''}${portfolioSummary.change24h.toLocaleString()}
-                {' '}({portfolioSummary.changePercent >= 0 ? '+' : ''}{portfolioSummary.changePercent}%) 24h
+              <p className={`text-sm mt-2 ${summary.change24hPercent >= 0 ? 'text-profit' : 'text-loss'}`}>
+                {summary.change24hPercent >= 0 ? '+' : ''}
+                {formatCurrency(summary.change24hUsd.toNumber())}
+                {' '}({summary.change24hPercent >= 0 ? '+' : ''}{summary.change24hPercent.toFixed(2)}%) 24h
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-surface-500">As of</p>
-              <p className="text-sm text-surface-400">{new Date().toLocaleString()}</p>
+              <p className="text-xs text-surface-500">Last updated</p>
+              <p className="text-sm text-surface-400">
+                {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Never'}
+              </p>
+              <button
+                onClick={() => refreshPortfolio()}
+                disabled={isLoading}
+                className="mt-2 text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+              >
+                {isLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
           </div>
         </div>
@@ -46,51 +52,64 @@ export function PortfolioPage() {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-surface-400">Assets</span>
-              <span className="text-surface-100 font-medium">{balances.length || 12}</span>
+              <span className="text-surface-100 font-medium">{summary.totalAssets}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-surface-400">Positions</span>
-              <span className="text-surface-100 font-medium">{allPositions.size || 3}</span>
+              <span className="text-surface-100 font-medium">{summary.totalPositions}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-surface-400">Exchanges</span>
-              <span className="text-surface-100 font-medium">2</span>
+              <span className="text-surface-100 font-medium">{connectedExchanges}</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Empty State */}
+      {!hasData && !isLoading && (
+        <div className="card p-8 text-center">
+          <div className="text-4xl mb-4">📊</div>
+          <h3 className="text-lg font-semibold text-surface-100 mb-2">No Portfolio Data</h3>
+          <p className="text-surface-400 mb-4">
+            Connect an exchange and sync your balances to see your portfolio.
+          </p>
+        </div>
+      )}
+
       {/* Asset Allocation */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Allocation</h2>
+      {hasData && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Allocation</h2>
 
-        {/* Progress bar */}
-        <div className="h-4 rounded-full overflow-hidden flex mb-4">
-          {assetAllocation.map((asset) => (
-            <div
-              key={asset.symbol}
-              className={`${asset.color} transition-all`}
-              style={{ width: `${asset.percent}%` }}
-              title={`${asset.name}: ${asset.percent}%`}
-            />
-          ))}
-        </div>
+          {/* Progress bar */}
+          <div className="h-4 rounded-full overflow-hidden flex mb-4">
+            {allocations.map((allocation) => (
+              <div
+                key={allocation.category}
+                className={`${allocation.color} transition-all`}
+                style={{ width: `${allocation.percent}%` }}
+                title={`${allocation.category}: ${allocation.percent.toFixed(1)}%`}
+              />
+            ))}
+          </div>
 
-        {/* Legend */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {assetAllocation.map((asset) => (
-            <div key={asset.symbol} className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${asset.color}`} />
-              <div>
-                <p className="text-sm font-medium text-surface-100">{asset.name}</p>
-                <p className="text-xs text-surface-400">
-                  ${asset.value.toLocaleString()} ({asset.percent}%)
-                </p>
+          {/* Legend */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {allocations.map((allocation) => (
+              <div key={allocation.category} className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${allocation.color}`} />
+                <div>
+                  <p className="text-sm font-medium text-surface-100">{allocation.category}</p>
+                  <p className="text-xs text-surface-400">
+                    {formatCurrency(allocation.value.toNumber())} ({allocation.percent.toFixed(1)}%)
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Performance Chart Placeholder */}
       <div className="card p-6">
@@ -119,44 +138,113 @@ export function PortfolioPage() {
       </div>
 
       {/* Top Holdings */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-surface-100 mb-4">Top Holdings</h2>
-        <div className="space-y-3">
-          {[
-            { symbol: 'BTC', name: 'Bitcoin', amount: '0.8521', value: 52000, change: 2.3 },
-            { symbol: 'ETH', name: 'Ethereum', amount: '12.5', value: 35000, change: -1.2 },
-            { symbol: 'USDT', name: 'Tether', amount: '15000', value: 15000, change: 0 },
-            { symbol: 'USDC', name: 'USD Coin', amount: '10000', value: 10000, change: 0 },
-            { symbol: 'SOL', name: 'Solana', amount: '85.2', value: 8500, change: 5.4 },
-          ].map((holding) => (
-            <div
-              key={holding.symbol}
-              className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
-                  {holding.symbol.slice(0, 2)}
+      {hasData && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-surface-100 mb-4">Top Holdings</h2>
+          <div className="space-y-3">
+            {holdings.slice(0, 10).map((holding) => (
+              <div
+                key={holding.symbol}
+                className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
+                    {holding.symbol.slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="font-medium text-surface-100">{holding.symbol}</p>
+                    <p className="text-xs text-surface-400">{holding.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-surface-100">{holding.symbol}</p>
-                  <p className="text-xs text-surface-400">{holding.name}</p>
+                <div className="text-right">
+                  <p className="font-medium text-surface-100 font-tabular">
+                    {formatCurrency(holding.valueUsd.toNumber())}
+                  </p>
+                  <p className="text-xs text-surface-400 font-tabular">
+                    {formatAmount(holding.totalAmount.toNumber())} {holding.symbol}
+                  </p>
+                </div>
+                <div className={`text-sm font-tabular w-16 text-right ${holding.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  {holding.change24h >= 0 ? '+' : ''}{holding.change24h.toFixed(2)}%
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-medium text-surface-100 font-tabular">
-                  ${holding.value.toLocaleString()}
-                </p>
-                <p className="text-xs text-surface-400 font-tabular">
-                  {holding.amount} {holding.symbol}
-                </p>
-              </div>
-              <div className={`text-sm font-tabular ${holding.change >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {holding.change >= 0 ? '+' : ''}{holding.change}%
-              </div>
+            ))}
+          </div>
+
+          {holdings.length > 10 && (
+            <div className="mt-4 text-center">
+              <button className="text-sm text-primary-400 hover:text-primary-300">
+                View all {holdings.length} assets
+              </button>
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Holdings by Exchange */}
+      {hasData && holdings.some(h => h.sources.length > 1) && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-surface-100 mb-4">Holdings by Exchange</h2>
+          <div className="space-y-4">
+            {holdings.filter(h => h.sources.length > 1).slice(0, 5).map((holding) => (
+              <div key={holding.symbol} className="bg-surface-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-surface-100">{holding.symbol}</span>
+                    <span className="text-xs text-surface-500">
+                      ({holding.sources.length} exchanges)
+                    </span>
+                  </div>
+                  <span className="text-surface-400">
+                    Total: {formatAmount(holding.totalAmount.toNumber())}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {holding.sources.map((source, idx) => (
+                    <div
+                      key={`${source.exchangeId}-${idx}`}
+                      className="flex justify-between text-sm"
+                    >
+                      <span className="text-surface-400">
+                        {source.exchangeName}
+                        <span className="text-surface-600 ml-1">({source.balanceType})</span>
+                      </span>
+                      <span className="text-surface-300 font-tabular">
+                        {formatAmount(source.amount.toNumber())}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatAmount(value: number): string {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(2)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)}K`;
+  }
+  if (value >= 1) {
+    return value.toFixed(4);
+  }
+  if (value >= 0.0001) {
+    return value.toFixed(6);
+  }
+  return value.toFixed(8);
 }
