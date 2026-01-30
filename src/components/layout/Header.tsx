@@ -8,6 +8,7 @@ const viewTitles: Record<ViewId, string> = {
   exchanges: 'Exchanges',
   wallets: 'Wallets',
   defi: 'DeFi Positions',
+  risk: 'Risk Management',
   tax: 'Tax Report',
   settings: 'Settings',
 };

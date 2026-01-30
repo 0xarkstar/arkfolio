@@ -8,6 +8,7 @@ import { ExchangesPage } from './features/cex';
 import { PortfolioPage } from './features/portfolio';
 import { WalletsPage } from './features/onchain';
 import { DefiPage } from './features/defi';
+import { RiskPage } from './features/risk';
 import { TaxPage } from './features/tax';
 import { SettingsPage } from './features/settings';
 
@@ -81,6 +82,8 @@ function PageRouter({ currentView }: { currentView: ViewId }) {
       return <WalletsPage />;
     case 'defi':
       return <DefiPage />;
+    case 'risk':
+      return <RiskPage />;
     case 'tax':
       return <TaxPage />;
     case 'settings':
