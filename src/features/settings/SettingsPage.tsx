@@ -3,6 +3,11 @@ import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { Switch, Select } from '../../components/Input';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
+import { Alert } from '../../components/Alert';
+import { SkeletonCard } from '../../components/Skeleton';
 import {
   settings as settingsTable,
   exchanges as exchangesTable,
@@ -172,8 +177,10 @@ export function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-surface-400">Loading settings...</div>
+      <div className="space-y-6 max-w-2xl">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </div>
     );
   }
@@ -182,13 +189,13 @@ export function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       {/* Saving indicator */}
       {isSaving && (
-        <div className="fixed top-4 right-4 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm">
-          Saving...
-        </div>
+        <Alert variant="info" className="fixed top-4 right-4 max-w-xs z-50">
+          Saving changes...
+        </Alert>
       )}
 
       {/* General Settings */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">General</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -196,16 +203,17 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Display Currency</p>
               <p className="text-sm text-surface-400">Choose your preferred display currency</p>
             </div>
-            <select
+            <Select
               value={settings.currency}
               onChange={(e) => handleSettingChange('currency', e.target.value as AppSettings['currency'])}
-              className="input w-32"
-            >
-              <option value="USD">USD</option>
-              <option value="KRW">KRW</option>
-              <option value="EUR">EUR</option>
-              <option value="BTC">BTC</option>
-            </select>
+              options={[
+                { value: 'USD', label: 'USD' },
+                { value: 'KRW', label: 'KRW' },
+                { value: 'EUR', label: 'EUR' },
+                { value: 'BTC', label: 'BTC' },
+              ]}
+              className="w-32"
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -213,14 +221,15 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Language</p>
               <p className="text-sm text-surface-400">Select interface language</p>
             </div>
-            <select
+            <Select
               value={settings.language}
               onChange={(e) => handleSettingChange('language', e.target.value as AppSettings['language'])}
-              className="input w-32"
-            >
-              <option value="en">English</option>
-              <option value="ko">Korean</option>
-            </select>
+              options={[
+                { value: 'en', label: 'English' },
+                { value: 'ko', label: 'Korean' },
+              ]}
+              className="w-32"
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -228,21 +237,22 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Theme</p>
               <p className="text-sm text-surface-400">Choose app appearance</p>
             </div>
-            <select
+            <Select
               value={settings.theme}
               onChange={(e) => handleSettingChange('theme', e.target.value as AppSettings['theme'])}
-              className="input w-32"
-            >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="system">System</option>
-            </select>
+              options={[
+                { value: 'dark', label: 'Dark' },
+                { value: 'light', label: 'Light' },
+                { value: 'system', label: 'System' },
+              ]}
+              className="w-32"
+            />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Sync Settings */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Sync & Data</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -250,15 +260,10 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Auto Sync</p>
               <p className="text-sm text-surface-400">Automatically sync exchange data</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.autoSync}
-                onChange={(e) => handleSettingChange('autoSync', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-            </label>
+            <Switch
+              checked={settings.autoSync}
+              onChange={(checked) => handleSettingChange('autoSync', checked)}
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -266,18 +271,19 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Sync Interval</p>
               <p className="text-sm text-surface-400">How often to sync data (in minutes)</p>
             </div>
-            <select
-              value={settings.syncInterval}
+            <Select
+              value={String(settings.syncInterval)}
               onChange={(e) => handleSettingChange('syncInterval', Number(e.target.value))}
-              className="input w-32"
               disabled={!settings.autoSync}
-            >
-              <option value={1}>1 min</option>
-              <option value={5}>5 min</option>
-              <option value={15}>15 min</option>
-              <option value={30}>30 min</option>
-              <option value={60}>1 hour</option>
-            </select>
+              options={[
+                { value: '1', label: '1 min' },
+                { value: '5', label: '5 min' },
+                { value: '15', label: '15 min' },
+                { value: '30', label: '30 min' },
+                { value: '60', label: '1 hour' },
+              ]}
+              className="w-32"
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -285,21 +291,16 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Notifications</p>
               <p className="text-sm text-surface-400">Receive alerts for price movements</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.notifications}
-                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-            </label>
+            <Switch
+              checked={settings.notifications}
+              onChange={(checked) => handleSettingChange('notifications', checked)}
+            />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Tax Settings */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Tax Settings</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -307,15 +308,16 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Cost Basis Method</p>
               <p className="text-sm text-surface-400">Method for calculating cost basis</p>
             </div>
-            <select
+            <Select
               value={settings.taxMethod}
               onChange={(e) => handleSettingChange('taxMethod', e.target.value as AppSettings['taxMethod'])}
-              className="input w-40"
-            >
-              <option value="moving_average">Moving Average</option>
-              <option value="fifo">FIFO</option>
-              <option value="lifo">LIFO</option>
-            </select>
+              options={[
+                { value: 'moving_average', label: 'Moving Average' },
+                { value: 'fifo', label: 'FIFO' },
+                { value: 'lifo', label: 'LIFO' },
+              ]}
+              className="w-40"
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -323,20 +325,21 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Annual Deduction (KRW)</p>
               <p className="text-sm text-surface-400">Basic deduction for tax calculation</p>
             </div>
-            <select
-              value={settings.taxDeduction}
+            <Select
+              value={String(settings.taxDeduction)}
               onChange={(e) => handleSettingChange('taxDeduction', Number(e.target.value))}
-              className="input w-40"
-            >
-              <option value={2500000}>2,500,000 (Current)</option>
-              <option value={50000000}>50,000,000 (2025~)</option>
-            </select>
+              options={[
+                { value: '2500000', label: '2,500,000 (Current)' },
+                { value: '50000000', label: '50,000,000 (2025~)' },
+              ]}
+              className="w-40"
+            />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Backup & Security */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Backup & Security</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -344,9 +347,9 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Google Drive Backup</p>
               <p className="text-sm text-surface-400">Sync encrypted backup to Google Drive</p>
             </div>
-            <button className="btn-secondary text-sm" disabled>
+            <Button variant="secondary" size="sm" disabled>
               Coming Soon
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -354,13 +357,14 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Export Data</p>
               <p className="text-sm text-surface-400">Download all your data as JSON</p>
             </div>
-            <button
+            <Button
               onClick={handleExportData}
-              className="btn-secondary text-sm"
-              disabled={!!exportStatus}
+              variant="secondary"
+              size="sm"
+              loading={!!exportStatus}
             >
-              {exportStatus || 'Export'}
-            </button>
+              Export
+            </Button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -368,8 +372,10 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Import Data</p>
               <p className="text-sm text-surface-400">Restore data from a backup file</p>
             </div>
-            <label className="btn-secondary text-sm cursor-pointer">
-              {importStatus || 'Import'}
+            <label className="cursor-pointer">
+              <span className="inline-flex items-center justify-center font-medium rounded-lg transition-colors duration-150 px-3 py-1.5 text-sm gap-1.5 bg-surface-700 hover:bg-surface-600 text-surface-100 border border-surface-600">
+                {importStatus || 'Import'}
+              </span>
               <input
                 type="file"
                 accept=".json"
@@ -385,18 +391,19 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Clear All Data</p>
               <p className="text-sm text-surface-400">Delete all local data permanently</p>
             </div>
-            <button
+            <Button
               onClick={() => setShowClearConfirm(true)}
-              className="px-4 py-2 bg-loss/20 hover:bg-loss/30 text-loss rounded-lg text-sm transition-colors"
+              variant="danger"
+              size="sm"
             >
               Clear Data
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Keyboard Shortcuts */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Keyboard Shortcuts</h2>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -411,11 +418,23 @@ export function SettingsPage() {
               Esc
             </kbd>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-surface-300">Show Shortcuts</span>
+            <kbd className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-300 font-mono">
+              ?
+            </kbd>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-surface-300">Navigate Pages</span>
+            <kbd className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-300 font-mono">
+              1-8
+            </kbd>
+          </div>
         </div>
-      </div>
+      </Card>
 
       {/* About */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">About</h2>
         <div className="space-y-2 text-sm text-surface-400">
           <p><span className="text-surface-300">Version:</span> 0.1.0</p>
@@ -447,7 +466,7 @@ export function SettingsPage() {
             Report Issue
           </a>
         </div>
-      </div>
+      </Card>
 
       {/* Clear Data Confirmation Dialog */}
       <ConfirmDialog
