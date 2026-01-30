@@ -8,6 +8,11 @@ import { priceService } from '../services/price';
 import { toast } from './Toast';
 import Decimal from 'decimal.js';
 import { Watchlist } from './Watchlist';
+import { Card } from './Card';
+import { Button } from './Button';
+import { Alert } from './Alert';
+import { AssetAvatar } from './Avatar';
+import { SkeletonCard } from './Skeleton';
 
 interface MarketPrice {
   symbol: string;
@@ -131,11 +136,7 @@ export default function Dashboard() {
         {portfolioLoading && holdings.length === 0 ? (
           <>
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="card p-4 animate-pulse">
-                <div className="h-4 w-28 bg-surface-700 rounded mb-2" />
-                <div className="h-7 w-32 bg-surface-600 rounded mb-2" />
-                <div className="h-4 w-24 bg-surface-700 rounded" />
-              </div>
+              <SkeletonCard key={i} />
             ))}
           </>
         ) : (
@@ -170,26 +171,19 @@ export default function Dashboard() {
 
       {/* Risk Alert Banner */}
       {(hasOpenPositions || (lowestHealthFactor < 2 && lowestHealthFactor !== Infinity)) && (
-        <div className="card p-4 border-warning/30 bg-warning/5">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl">&#9888;</div>
-            <div className="flex-1">
-              <p className="font-medium text-surface-100">Risk Alert</p>
-              <p className="text-sm text-surface-400">
-                {totalPositions > 0 && `${totalPositions} open futures position${totalPositions !== 1 ? 's' : ''}. `}
-                {lowestHealthFactor < 2 && lowestHealthFactor !== Infinity &&
-                  `Lowest health factor: ${lowestHealthFactor.toFixed(2)}`}
-              </p>
-            </div>
-            <button onClick={() => setView('defi')} className="btn-secondary text-sm">
-              View Risk
-            </button>
-          </div>
-        </div>
+        <Alert
+          variant="warning"
+          title="Risk Alert"
+          action={{ label: 'View Risk', onClick: () => setView('defi') }}
+        >
+          {totalPositions > 0 && `${totalPositions} open futures position${totalPositions !== 1 ? 's' : ''}. `}
+          {lowestHealthFactor < 2 && lowestHealthFactor !== Infinity &&
+            `Lowest health factor: ${lowestHealthFactor.toFixed(2)}`}
+        </Alert>
       )}
 
       {/* Quick Actions */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <ActionCard
@@ -211,12 +205,12 @@ export default function Dashboard() {
             onClick={() => setView('tax')}
           />
         </div>
-      </div>
+      </Card>
 
       {/* Portfolio Breakdown & Market Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Portfolio Breakdown */}
-        <div className="card p-6">
+        <Card className="p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Portfolio Breakdown</h2>
           {totalPortfolioValue.greaterThan(0) ? (
             <div className="space-y-4">
@@ -231,7 +225,7 @@ export default function Dashboard() {
                 label="On-chain Wallets"
                 value={walletsValue}
                 total={totalPortfolioValue}
-                color="bg-profit"
+                color="bg-gain"
                 onClick={() => setView('wallets')}
               />
               <BreakdownItem
@@ -248,10 +242,10 @@ export default function Dashboard() {
               <p className="text-sm mt-1">Connect an exchange or add a wallet</p>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Market Overview */}
-        <div className="card p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-surface-100">Market Overview</h2>
             <div className="flex items-center gap-3">
@@ -260,13 +254,15 @@ export default function Dashboard() {
                   Updated {lastPriceUpdate.toLocaleTimeString()}
                 </span>
               )}
-              <button
+              <Button
                 onClick={() => fetchPrices(true)}
                 disabled={isRefreshingPrices || pricesLoading}
-                className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+                variant="ghost"
+                size="xs"
+                loading={isRefreshingPrices}
               >
-                {isRefreshingPrices ? 'Refreshing...' : 'Refresh'}
-              </button>
+                Refresh
+              </Button>
             </div>
           </div>
           {pricesLoading ? (
@@ -295,9 +291,7 @@ export default function Dashboard() {
                   className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium text-primary-400">
-                      {coin.symbol.slice(0, 2)}
-                    </div>
+                    <AssetAvatar symbol={coin.symbol} size="sm" />
                     <div>
                       <p className="font-medium text-surface-100">{coin.symbol}</p>
                       <p className="text-xs text-surface-400">{coin.name}</p>
@@ -307,7 +301,7 @@ export default function Dashboard() {
                     <p className="font-medium text-surface-100 font-tabular">
                       ${coin.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
-                    <p className={`text-xs font-tabular ${coin.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    <p className={`text-xs font-tabular ${coin.change24h >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {coin.change24h >= 0 ? '+' : ''}{coin.change24h.toFixed(2)}%
                     </p>
                   </div>
@@ -315,20 +309,21 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
       {/* Top Holdings */}
       {holdings.length > 0 && (
-        <div className="card p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-surface-100">Top Holdings</h2>
-            <button
+            <Button
               onClick={() => setView('portfolio')}
-              className="text-sm text-primary-400 hover:text-primary-300"
+              variant="ghost"
+              size="xs"
             >
               View All
-            </button>
+            </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {holdings.slice(0, 6).map((holding) => (
@@ -336,9 +331,7 @@ export default function Dashboard() {
                 key={holding.symbol}
                 className="bg-surface-800 rounded-lg p-4 flex items-center gap-3"
               >
-                <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-sm font-medium text-primary-400">
-                  {holding.symbol.slice(0, 2)}
-                </div>
+                <AssetAvatar symbol={holding.symbol} size="md" />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-surface-100 truncate">{holding.symbol}</p>
                   <p className="text-xs text-surface-400 font-tabular">
@@ -349,14 +342,14 @@ export default function Dashboard() {
                   <p className="font-medium text-surface-100 font-tabular">
                     {formatCurrency(holding.valueUsd.toNumber())}
                   </p>
-                  <p className={`text-xs font-tabular ${holding.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  <p className={`text-xs font-tabular ${holding.change24h >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {holding.change24h >= 0 ? '+' : ''}{holding.change24h.toFixed(2)}%
                   </p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Watchlist */}
@@ -364,20 +357,13 @@ export default function Dashboard() {
 
       {/* Welcome Banner */}
       {accounts.length === 0 && wallets.length === 0 && (
-        <div className="card p-4 border-primary-600/30 bg-primary-600/5">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl">&#128075;</div>
-            <div className="flex-1">
-              <p className="font-medium text-surface-100">Welcome to ArkFolio!</p>
-              <p className="text-sm text-surface-400">
-                Get started by connecting your first exchange or adding a wallet to track.
-              </p>
-            </div>
-            <button onClick={() => setView('exchanges')} className="btn-primary">
-              Get Started
-            </button>
-          </div>
-        </div>
+        <Alert
+          variant="info"
+          title="Welcome to ArkFolio!"
+          action={{ label: 'Get Started', onClick: () => setView('exchanges') }}
+        >
+          Get started by connecting your first exchange or adding a wallet to track.
+        </Alert>
       )}
     </div>
   );
@@ -422,9 +408,9 @@ function ActionCard({ title, description, action, onClick }: ActionCardProps) {
     <div className="bg-surface-800 rounded-lg p-4 flex flex-col">
       <h3 className="font-medium text-surface-100 mb-2">{title}</h3>
       <p className="text-sm text-surface-400 mb-4 flex-1">{description}</p>
-      <button onClick={onClick} className="btn-primary text-sm">
+      <Button onClick={onClick} size="sm" fullWidth>
         {action}
-      </button>
+      </Button>
     </div>
   );
 }
