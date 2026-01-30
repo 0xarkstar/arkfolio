@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useWatchlistStore, WatchlistItem } from '../stores/watchlistStore';
 import { toast } from './Toast';
+import { ConfirmDialog } from './ConfirmDialog';
 
 // Common crypto assets for quick add
 const POPULAR_ASSETS = [
@@ -37,6 +38,9 @@ export function Watchlist() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [customSymbol, setCustomSymbol] = useState('');
   const [customName, setCustomName] = useState('');
+  const [itemToRemove, setItemToRemove] = useState<WatchlistItem | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadWatchlist();
@@ -46,9 +50,28 @@ export function Watchlist() {
   useEffect(() => {
     if (items.length === 0) return;
 
-    const interval = setInterval(refreshPrices, 60000);
+    const doRefresh = async () => {
+      await refreshPrices();
+      setLastRefresh(new Date());
+    };
+
+    doRefresh();
+    const interval = setInterval(doRefresh, 60000);
     return () => clearInterval(interval);
   }, [items.length, refreshPrices]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshPrices();
+      setLastRefresh(new Date());
+      toast.success('Watchlist prices updated');
+    } catch {
+      toast.error('Failed to refresh prices');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleAddCustom = async () => {
     if (!customSymbol.trim()) return;
@@ -68,9 +91,16 @@ export function Watchlist() {
     toast.success(`Added ${symbol} to watchlist`);
   };
 
-  const handleRemove = async (item: WatchlistItem) => {
-    await removeFromWatchlist(item.id);
-    toast.info(`Removed ${item.symbol} from watchlist`);
+  const handleRemove = (item: WatchlistItem) => {
+    setItemToRemove(item);
+  };
+
+  const confirmRemove = async () => {
+    if (itemToRemove) {
+      await removeFromWatchlist(itemToRemove.id);
+      toast.info(`Removed ${itemToRemove.symbol} from watchlist`);
+      setItemToRemove(null);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -85,17 +115,51 @@ export function Watchlist() {
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-surface-100">Watchlist</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="text-sm text-primary-400 hover:text-primary-300"
-        >
-          + Add
-        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-surface-100">Watchlist</h2>
+          {lastRefresh && items.length > 0 && (
+            <p className="text-xs text-surface-500">
+              Updated {lastRefresh.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {items.length > 0 && (
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="text-xs text-surface-400 hover:text-surface-300 disabled:opacity-50"
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="text-sm text-primary-400 hover:text-primary-300"
+          >
+            + Add
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-surface-400">Loading...</div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between py-2 px-3 bg-surface-800 rounded-lg animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-surface-700 rounded-full" />
+                <div>
+                  <div className="h-4 w-12 bg-surface-700 rounded" />
+                  <div className="h-3 w-16 bg-surface-700 rounded mt-1" />
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="h-4 w-16 bg-surface-700 rounded" />
+                <div className="h-3 w-10 bg-surface-700 rounded mt-1" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : items.length === 0 ? (
         <div className="py-8 text-center">
           <div className="text-3xl mb-2">&#9734;</div>
@@ -210,6 +274,17 @@ export function Watchlist() {
           </div>
         </div>
       )}
+
+      {/* Remove Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={!!itemToRemove}
+        title="Remove from Watchlist"
+        message={`Remove ${itemToRemove?.symbol} from your watchlist?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={confirmRemove}
+        onCancel={() => setItemToRemove(null)}
+      />
     </div>
   );
 }
