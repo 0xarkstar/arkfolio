@@ -7,6 +7,7 @@ import {
   PositionsTable,
   TransactionsTable,
 } from './components';
+import { Button } from '../../components/Button';
 
 export function ExchangesPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -29,16 +30,16 @@ export function ExchangesPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={() => syncAllExchanges()}
             disabled={connectedCount === 0}
-            className="btn-secondary"
+            variant="secondary"
           >
             Sync All
-          </button>
-          <button onClick={() => setIsAddModalOpen(true)} className="btn-primary">
+          </Button>
+          <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
             Add Exchange
-          </button>
+          </Button>
         </div>
       </div>
 
