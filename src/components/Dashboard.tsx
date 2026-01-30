@@ -1,23 +1,57 @@
+import { useEffect } from 'react';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useExchangeStore } from '../stores/exchangeStore';
+import { usePortfolioStore } from '../stores/portfolioStore';
+import { useWalletsStore } from '../stores/walletsStore';
+import { useDefiStore } from '../stores/defiStore';
+import Decimal from 'decimal.js';
+
+interface MarketPrice {
+  symbol: string;
+  name: string;
+  price: number;
+  change24h: number;
+}
 
 export default function Dashboard() {
   const { setView } = useNavigationStore();
-  const { accounts, getAggregatedBalances, allPositions } = useExchangeStore();
+  const { accounts, allPositions } = useExchangeStore();
+  const { summary, holdings, refreshPortfolio } = usePortfolioStore();
+  const { wallets, getTotalValueUsd: getWalletsTotalValue, loadWallets } = useWalletsStore();
+  const { positions: defiPositions, getTotalValueUsd: getDefiTotalValue, loadPositions: loadDefiPositions } = useDefiStore();
 
-  const balances = getAggregatedBalances();
+  // Load data on mount
+  useEffect(() => {
+    refreshPortfolio();
+    loadWallets();
+    loadDefiPositions();
+  }, [refreshPortfolio, loadWallets, loadDefiPositions]);
+
   const connectedExchanges = accounts.filter(a => a.isConnected).length;
   const totalPositions = Array.from(allPositions.values()).reduce(
     (sum, positions) => sum + positions.length,
     0
   );
 
-  // Mock data for now
-  const portfolioSummary = {
-    totalValue: 125432.56,
-    change24h: 2341.23,
-    changePercent: 1.9,
-  };
+  // Calculate total portfolio value from all sources
+  const cexValue = summary.totalValueUsd;
+  const walletsValue = getWalletsTotalValue();
+  const defiValue = getDefiTotalValue();
+  const totalPortfolioValue = cexValue.plus(walletsValue).plus(defiValue);
+
+  // Mock market data (would be fetched from price service in production)
+  const marketPrices: MarketPrice[] = [
+    { symbol: 'BTC', name: 'Bitcoin', price: 67234.56, change24h: 2.34 },
+    { symbol: 'ETH', name: 'Ethereum', price: 3456.78, change24h: -1.23 },
+    { symbol: 'SOL', name: 'Solana', price: 123.45, change24h: 5.67 },
+    { symbol: 'BNB', name: 'BNB', price: 567.89, change24h: 0.45 },
+  ];
+
+  // Calculate risk metrics
+  const hasOpenPositions = totalPositions > 0;
+  const lowestHealthFactor = defiPositions
+    .filter(p => p.healthFactor !== null)
+    .reduce((min, p) => Math.min(min, p.healthFactor || Infinity), Infinity);
 
   return (
     <div className="space-y-6">
@@ -25,26 +59,49 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           title="Total Portfolio Value"
-          value={formatCurrency(portfolioSummary.totalValue)}
-          subtitle="USD"
+          value={formatCurrency(totalPortfolioValue.toNumber())}
+          subtitle="All assets combined"
+          onClick={() => setView('portfolio')}
         />
         <SummaryCard
           title="24h Change"
-          value={formatCurrency(portfolioSummary.change24h)}
-          subtitle={`${portfolioSummary.changePercent >= 0 ? '+' : ''}${portfolioSummary.changePercent.toFixed(2)}%`}
-          trend={portfolioSummary.change24h >= 0 ? 'profit' : 'loss'}
+          value={formatCurrency(summary.change24hUsd.toNumber())}
+          subtitle={`${summary.change24hPercent >= 0 ? '+' : ''}${summary.change24hPercent.toFixed(2)}%`}
+          trend={summary.change24hPercent >= 0 ? 'profit' : 'loss'}
         />
         <SummaryCard
           title="CEX Assets"
-          value={balances.length > 0 ? `${balances.length} assets` : '$0.00'}
+          value={holdings.length > 0 ? formatCurrency(cexValue.toNumber()) : '$0.00'}
           subtitle={`${connectedExchanges} exchange${connectedExchanges !== 1 ? 's' : ''}`}
+          onClick={() => setView('exchanges')}
         />
         <SummaryCard
-          title="Open Positions"
-          value={totalPositions.toString()}
-          subtitle="Futures/Perp"
+          title="On-chain + DeFi"
+          value={formatCurrency(walletsValue.plus(defiValue).toNumber())}
+          subtitle={`${wallets.length} wallet${wallets.length !== 1 ? 's' : ''}, ${defiPositions.length} positions`}
+          onClick={() => setView('wallets')}
         />
       </div>
+
+      {/* Risk Alert Banner */}
+      {(hasOpenPositions || (lowestHealthFactor < 2 && lowestHealthFactor !== Infinity)) && (
+        <div className="card p-4 border-warning/30 bg-warning/5">
+          <div className="flex items-center gap-4">
+            <div className="text-2xl">&#9888;</div>
+            <div className="flex-1">
+              <p className="font-medium text-surface-100">Risk Alert</p>
+              <p className="text-sm text-surface-400">
+                {totalPositions > 0 && `${totalPositions} open futures position${totalPositions !== 1 ? 's' : ''}. `}
+                {lowestHealthFactor < 2 && lowestHealthFactor !== Infinity &&
+                  `Lowest health factor: ${lowestHealthFactor.toFixed(2)}`}
+              </p>
+            </div>
+            <button onClick={() => setView('defi')} className="btn-secondary text-sm">
+              View Risk
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="card p-6">
@@ -71,17 +128,48 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Market Overview (Mock) */}
+      {/* Portfolio Breakdown & Market Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Portfolio Breakdown */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-surface-100 mb-4">Portfolio Breakdown</h2>
+          {totalPortfolioValue.greaterThan(0) ? (
+            <div className="space-y-4">
+              <BreakdownItem
+                label="CEX Holdings"
+                value={cexValue}
+                total={totalPortfolioValue}
+                color="bg-primary-500"
+                onClick={() => setView('exchanges')}
+              />
+              <BreakdownItem
+                label="On-chain Wallets"
+                value={walletsValue}
+                total={totalPortfolioValue}
+                color="bg-profit"
+                onClick={() => setView('wallets')}
+              />
+              <BreakdownItem
+                label="DeFi Positions"
+                value={defiValue}
+                total={totalPortfolioValue}
+                color="bg-blue-500"
+                onClick={() => setView('defi')}
+              />
+            </div>
+          ) : (
+            <div className="text-center py-8 text-surface-500">
+              <p>No assets tracked yet</p>
+              <p className="text-sm mt-1">Connect an exchange or add a wallet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Market Overview */}
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Market Overview</h2>
           <div className="space-y-3">
-            {[
-              { symbol: 'BTC', name: 'Bitcoin', price: 67234.56, change: 2.34 },
-              { symbol: 'ETH', name: 'Ethereum', price: 3456.78, change: -1.23 },
-              { symbol: 'SOL', name: 'Solana', price: 123.45, change: 5.67 },
-              { symbol: 'BNB', name: 'BNB', price: 567.89, change: 0.45 },
-            ].map((coin) => (
+            {marketPrices.map((coin) => (
               <div
                 key={coin.symbol}
                 className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
@@ -99,64 +187,62 @@ export default function Dashboard() {
                   <p className="font-medium text-surface-100 font-tabular">
                     ${coin.price.toLocaleString()}
                   </p>
-                  <p className={`text-xs font-tabular ${coin.change >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {coin.change >= 0 ? '+' : ''}{coin.change}%
+                  <p className={`text-xs font-tabular ${coin.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {coin.change24h >= 0 ? '+' : ''}{coin.change24h}%
                   </p>
                 </div>
               </div>
             ))}
           </div>
         </div>
-
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-surface-100 mb-4">Recent Activity</h2>
-          {accounts.length === 0 ? (
-            <div className="text-center py-8 text-surface-500">
-              <p>No activity yet</p>
-              <p className="text-sm mt-1">Connect an exchange or wallet to see your transactions</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {[
-                { type: 'Trade', asset: 'BTC', action: 'Buy', amount: '0.05', time: '2 hours ago' },
-                { type: 'Deposit', asset: 'USDT', action: 'Received', amount: '1,000', time: '5 hours ago' },
-                { type: 'Trade', asset: 'ETH', action: 'Sell', amount: '2.5', time: '1 day ago' },
-              ].map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${
-                      activity.action === 'Buy' || activity.action === 'Received'
-                        ? 'bg-profit/20 text-profit'
-                        : 'bg-loss/20 text-loss'
-                    }`}>
-                      {activity.action === 'Buy' || activity.action === 'Received' ? '↓' : '↑'}
-                    </div>
-                    <div>
-                      <p className="font-medium text-surface-100">{activity.action} {activity.asset}</p>
-                      <p className="text-xs text-surface-400">{activity.type}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-surface-100 font-tabular">
-                      {activity.amount} {activity.asset}
-                    </p>
-                    <p className="text-xs text-surface-400">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Alert Banner */}
-      {accounts.length === 0 && (
+      {/* Top Holdings */}
+      {holdings.length > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-100">Top Holdings</h2>
+            <button
+              onClick={() => setView('portfolio')}
+              className="text-sm text-primary-400 hover:text-primary-300"
+            >
+              View All
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {holdings.slice(0, 6).map((holding) => (
+              <div
+                key={holding.symbol}
+                className="bg-surface-800 rounded-lg p-4 flex items-center gap-3"
+              >
+                <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-sm font-medium text-primary-400">
+                  {holding.symbol.slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-surface-100 truncate">{holding.symbol}</p>
+                  <p className="text-xs text-surface-400 font-tabular">
+                    {formatAmount(holding.totalAmount.toNumber())}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-surface-100 font-tabular">
+                    {formatCurrency(holding.valueUsd.toNumber())}
+                  </p>
+                  <p className={`text-xs font-tabular ${holding.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {holding.change24h >= 0 ? '+' : ''}{holding.change24h.toFixed(2)}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Welcome Banner */}
+      {accounts.length === 0 && wallets.length === 0 && (
         <div className="card p-4 border-primary-600/30 bg-primary-600/5">
           <div className="flex items-center gap-4">
-            <div className="text-2xl">👋</div>
+            <div className="text-2xl">&#128075;</div>
             <div className="flex-1">
               <p className="font-medium text-surface-100">Welcome to ArkFolio!</p>
               <p className="text-sm text-surface-400">
@@ -178,11 +264,15 @@ interface SummaryCardProps {
   value: string;
   subtitle: string;
   trend?: 'profit' | 'loss';
+  onClick?: () => void;
 }
 
-function SummaryCard({ title, value, subtitle, trend }: SummaryCardProps) {
+function SummaryCard({ title, value, subtitle, trend, onClick }: SummaryCardProps) {
   return (
-    <div className="card p-4">
+    <div
+      className={`card p-4 ${onClick ? 'cursor-pointer hover:bg-surface-800/50 transition-colors' : ''}`}
+      onClick={onClick}
+    >
       <p className="text-sm text-surface-400 mb-1">{title}</p>
       <p className="text-2xl font-semibold font-tabular text-surface-100">{value}</p>
       <p className={`text-sm mt-1 ${
@@ -215,6 +305,46 @@ function ActionCard({ title, description, action, onClick }: ActionCardProps) {
   );
 }
 
+interface BreakdownItemProps {
+  label: string;
+  value: Decimal;
+  total: Decimal;
+  color: string;
+  onClick?: () => void;
+}
+
+function BreakdownItem({ label, value, total, color, onClick }: BreakdownItemProps) {
+  const percent = total.greaterThan(0) ? value.div(total).times(100).toNumber() : 0;
+
+  return (
+    <div
+      className={`${onClick ? 'cursor-pointer hover:bg-surface-800/30 rounded-lg p-2 -m-2 transition-colors' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${color}`} />
+          <span className="text-surface-300">{label}</span>
+        </div>
+        <div className="text-right">
+          <span className="font-medium text-surface-100 font-tabular">
+            {formatCurrency(value.toNumber())}
+          </span>
+          <span className="text-surface-500 text-sm ml-2">
+            ({percent.toFixed(1)}%)
+          </span>
+        </div>
+      </div>
+      <div className="h-2 bg-surface-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full ${color} transition-all`}
+          style={{ width: `${Math.max(percent, 1)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -222,4 +352,17 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatAmount(value: number): string {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(2)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)}K`;
+  }
+  if (value >= 1) {
+    return value.toFixed(4);
+  }
+  return value.toFixed(6);
 }

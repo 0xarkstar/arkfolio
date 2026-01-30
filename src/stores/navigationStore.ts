@@ -6,6 +6,7 @@ export type ViewId =
   | 'exchanges'
   | 'wallets'
   | 'defi'
+  | 'risk'
   | 'tax'
   | 'settings';
 
