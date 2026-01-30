@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from './stores/appStore';
 import { useNavigationStore, ViewId } from './stores/navigationStore';
+import { useSettingsStore } from './stores/settingsStore';
 import { initDatabase } from './database/init';
+import { useAutoSync } from './hooks';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './components/Dashboard';
 import { ExchangesPage } from './features/cex';
@@ -17,12 +19,15 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const { setDbReady } = useAppStore();
   const { currentView } = useNavigationStore();
+  const { loadSettings } = useSettingsStore();
 
+  // Initialize database and load settings
   useEffect(() => {
     async function init() {
       try {
         await initDatabase();
         setDbReady(true);
+        await loadSettings();
         setIsLoading(false);
       } catch (err) {
         console.error('Failed to initialize database:', err);
@@ -32,7 +37,10 @@ function App() {
     }
 
     init();
-  }, [setDbReady]);
+  }, [setDbReady, loadSettings]);
+
+  // Enable auto-sync when database is ready
+  useAutoSync();
 
   if (isLoading) {
     return (
