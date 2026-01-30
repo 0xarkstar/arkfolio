@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getDb } from '../../../database/init';
 import { transactions } from '../../../database/schema';
 import { desc } from 'drizzle-orm';
 import { useExchangeStore } from '../../../stores/exchangeStore';
+import { toast } from '../../../components/Toast';
 
 interface Transaction {
   id: string;
@@ -22,6 +23,7 @@ export function TransactionsTable() {
   const [txList, setTxList] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'buy' | 'sell' | 'transfer'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     async function loadTransactions() {
@@ -98,13 +100,65 @@ export function TransactionsTable() {
     return value.toFixed(8);
   };
 
-  const filteredTx = txList.filter(tx => {
-    if (filter === 'all') return true;
-    if (filter === 'buy') return tx.type.toLowerCase() === 'buy';
-    if (filter === 'sell') return tx.type.toLowerCase() === 'sell';
-    if (filter === 'transfer') return tx.type.toLowerCase().includes('transfer');
-    return true;
-  });
+  const filteredTx = useMemo(() => {
+    const getExchangeNameLocal = (exchangeId: string | null) => {
+      if (!exchangeId) return 'Unknown';
+      const account = accounts.find(a => a.id === exchangeId);
+      return account?.name || exchangeId;
+    };
+
+    let filtered = txList;
+
+    // Apply type filter
+    if (filter !== 'all') {
+      if (filter === 'buy') filtered = filtered.filter(tx => tx.type.toLowerCase() === 'buy');
+      else if (filter === 'sell') filtered = filtered.filter(tx => tx.type.toLowerCase() === 'sell');
+      else if (filter === 'transfer') filtered = filtered.filter(tx => tx.type.toLowerCase().includes('transfer'));
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(tx =>
+        tx.asset.toLowerCase().includes(query) ||
+        getExchangeNameLocal(tx.exchangeId).toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [txList, filter, searchQuery, accounts]);
+
+  const handleExportCSV = () => {
+    if (txList.length === 0) {
+      toast.error('No transactions to export');
+      return;
+    }
+
+    const headers = ['Date', 'Type', 'Asset', 'Amount', 'Price (USD)', 'Value (USD)', 'Fee', 'Fee Asset', 'Exchange'];
+    const rows = filteredTx.map(tx => [
+      tx.timestamp instanceof Date ? tx.timestamp.toISOString() : new Date(tx.timestamp).toISOString(),
+      tx.type,
+      tx.asset,
+      tx.amount.toString(),
+      tx.priceUsd?.toString() || '',
+      tx.priceUsd ? (tx.amount * tx.priceUsd).toFixed(2) : '',
+      tx.fee?.toString() || '',
+      tx.feeAsset || '',
+      getExchangeName(tx.exchangeId),
+    ]);
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Transactions exported to CSV');
+  };
 
   if (txList.length === 0 && !isLoading) {
     return null; // Don't show section if no transactions
@@ -112,22 +166,42 @@ export function TransactionsTable() {
 
   return (
     <div className="card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-surface-100">Transaction History</h2>
-        <div className="flex gap-2">
-          {(['all', 'buy', 'sell', 'transfer'] as const).map(f => (
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <h2 className="text-lg font-semibold text-surface-100">
+          Transaction History
+          {(searchQuery || filter !== 'all') && ` (${filteredTx.length} of ${txList.length})`}
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search..."
+            className="input py-1.5 text-sm w-32"
+          />
+          <div className="flex gap-1">
+            {(['all', 'buy', 'sell', 'transfer'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1 text-sm rounded ${
+                  filter === f
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
+                }`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+          {txList.length > 0 && (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-sm rounded ${
-                filter === f
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
-              }`}
+              onClick={handleExportCSV}
+              className="text-xs text-primary-400 hover:text-primary-300"
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              Export CSV
             </button>
-          ))}
+          )}
         </div>
       </div>
 
