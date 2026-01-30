@@ -3,6 +3,13 @@ import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { PortfolioChart } from '../../components/charts';
 import { toast } from '../../components/Toast';
+import { Card } from '../../components/Card';
+import { Button } from '../../components/Button';
+import { SearchInput } from '../../components/SearchInput';
+import { AssetAvatar } from '../../components/Avatar';
+import { Badge } from '../../components/Badge';
+import { SkeletonCard } from '../../components/Skeleton';
+import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 
 type SortField = 'value' | 'change' | 'name' | 'amount';
 type SortDirection = 'asc' | 'desc';
@@ -108,30 +115,21 @@ export function PortfolioPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {isLoading && !hasData ? (
           <>
-            <div className="card p-6 md:col-span-2 animate-pulse">
-              <div className="h-4 w-32 bg-surface-700 rounded mb-2" />
-              <div className="h-10 w-48 bg-surface-600 rounded mb-2" />
-              <div className="h-4 w-40 bg-surface-700 rounded" />
+            <div className="md:col-span-2">
+              <SkeletonCard />
             </div>
-            <div className="card p-6 animate-pulse">
-              <div className="h-4 w-24 bg-surface-700 rounded mb-4" />
-              <div className="space-y-3">
-                <div className="h-4 bg-surface-700 rounded" />
-                <div className="h-4 bg-surface-700 rounded" />
-                <div className="h-4 bg-surface-700 rounded" />
-              </div>
-            </div>
+            <SkeletonCard />
           </>
         ) : (
           <>
-            <div className="card p-6 md:col-span-2">
+            <Card className="p-6 md:col-span-2">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-surface-400 mb-1">Total Portfolio Value</p>
                   <p className="text-4xl font-bold text-surface-100 font-tabular">
                     {formatCurrency(summary.totalValueUsd.toNumber())}
                   </p>
-                  <p className={`text-sm mt-2 ${summary.change24hPercent >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  <p className={`text-sm mt-2 ${summary.change24hPercent >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {summary.change24hPercent >= 0 ? '+' : ''}
                     {formatCurrency(summary.change24hUsd.toNumber())}
                     {' '}({summary.change24hPercent >= 0 ? '+' : ''}{summary.change24hPercent.toFixed(2)}%) 24h
@@ -143,30 +141,30 @@ export function PortfolioPage() {
                     {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Never'}
                   </p>
                   <div className="flex gap-2 mt-2 justify-end">
-                    <button
+                    <Button
                       onClick={() => refreshPortfolio()}
                       disabled={isLoading}
-                      className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+                      variant="ghost"
+                      size="xs"
+                      loading={isLoading}
                     >
-                      {isLoading ? 'Refreshing...' : 'Refresh'}
-                    </button>
+                      Refresh
+                    </Button>
                     {hasData && (
-                      <>
-                        <span className="text-surface-600">|</span>
-                        <button
-                          onClick={handleExportCSV}
-                          className="text-xs text-primary-400 hover:text-primary-300"
-                        >
-                          Export CSV
-                        </button>
-                      </>
+                      <Button
+                        onClick={handleExportCSV}
+                        variant="ghost"
+                        size="xs"
+                      >
+                        Export CSV
+                      </Button>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
 
-            <div className="card p-6">
+            <Card className="p-6">
               <p className="text-sm text-surface-400 mb-4">Quick Stats</p>
               <div className="space-y-3">
                 <div className="flex justify-between">
@@ -182,25 +180,21 @@ export function PortfolioPage() {
                   <span className="text-surface-100 font-medium">{connectedExchanges}</span>
                 </div>
               </div>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Empty State */}
       {!hasData && !isLoading && (
-        <div className="card p-8 text-center">
-          <div className="text-4xl mb-4">📊</div>
-          <h3 className="text-lg font-semibold text-surface-100 mb-2">No Portfolio Data</h3>
-          <p className="text-surface-400 mb-4">
-            Connect an exchange and sync your balances to see your portfolio.
-          </p>
-        </div>
+        <Card className="p-8">
+          <NoDataEmptyState />
+        </Card>
       )}
 
       {/* Asset Allocation */}
       {hasData && (
-        <div className="card p-6">
+        <Card className="p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Allocation</h2>
 
           {/* Progress bar */}
@@ -229,118 +223,116 @@ export function PortfolioPage() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Performance Chart */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Performance</h2>
         <PortfolioChart height={300} />
-      </div>
+      </Card>
 
       {/* Top Holdings */}
       {hasData && (
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <h2 className="text-lg font-semibold text-surface-100">
               Holdings
-              {searchQuery && ` (${filteredAndSortedHoldings.length} results)`}
+              {searchQuery && (
+                <span className="text-surface-400 font-normal text-sm ml-2">
+                  ({filteredAndSortedHoldings.length} results)
+                </span>
+              )}
             </h2>
-            <div className="flex items-center gap-4">
-              <input
-                type="text"
+            <div className="flex flex-wrap items-center gap-3">
+              <SearchInput
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={setSearchQuery}
                 placeholder="Search assets..."
-                className="input py-1 text-sm w-40"
+                size="sm"
+                className="w-40"
               />
-              <div className="flex items-center gap-2 text-xs text-surface-400">
-                <span>Sort:</span>
-                <button
-                  onClick={() => handleSort('name')}
-                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'name' ? 'text-primary-400' : ''}`}
-                >
-                  Name<SortIcon field="name" />
-                </button>
-                <button
-                  onClick={() => handleSort('value')}
-                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'value' ? 'text-primary-400' : ''}`}
-                >
-                  Value<SortIcon field="value" />
-                </button>
-                <button
-                  onClick={() => handleSort('change')}
-                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'change' ? 'text-primary-400' : ''}`}
-                >
-                  24h<SortIcon field="change" />
-                </button>
+              <div className="flex items-center gap-1">
+                {(['name', 'value', 'change'] as const).map((field) => (
+                  <Button
+                    key={field}
+                    onClick={() => handleSort(field)}
+                    variant={sortField === field ? 'primary' : 'ghost'}
+                    size="xs"
+                  >
+                    {field === 'change' ? '24h' : field.charAt(0).toUpperCase() + field.slice(1)}
+                    <SortIcon field={field} />
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
-          <div className="space-y-3">
-            {displayedHoldings.map((holding) => (
-              <div
-                key={holding.symbol}
-                className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
-                    {holding.symbol.slice(0, 2)}
+
+          {filteredAndSortedHoldings.length === 0 && searchQuery ? (
+            <NoResultsEmptyState
+              searchTerm={searchQuery}
+              onClear={() => setSearchQuery('')}
+            />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {displayedHoldings.map((holding) => (
+                  <div
+                    key={holding.symbol}
+                    className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <AssetAvatar symbol={holding.symbol} size="sm" />
+                      <div>
+                        <p className="font-medium text-surface-100">{holding.symbol}</p>
+                        <p className="text-xs text-surface-400">{holding.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-surface-100 font-tabular">
+                        {formatCurrency(holding.valueUsd.toNumber())}
+                      </p>
+                      <p className="text-xs text-surface-400 font-tabular">
+                        {formatAmount(holding.totalAmount.toNumber())} {holding.symbol}
+                      </p>
+                    </div>
+                    <div className={`text-sm font-tabular w-16 text-right ${holding.change24h >= 0 ? 'text-gain' : 'text-loss'}`}>
+                      {holding.change24h >= 0 ? '+' : ''}{holding.change24h.toFixed(2)}%
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-surface-100">{holding.symbol}</p>
-                    <p className="text-xs text-surface-400">{holding.name}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-surface-100 font-tabular">
-                    {formatCurrency(holding.valueUsd.toNumber())}
-                  </p>
-                  <p className="text-xs text-surface-400 font-tabular">
-                    {formatAmount(holding.totalAmount.toNumber())} {holding.symbol}
-                  </p>
-                </div>
-                <div className={`text-sm font-tabular w-16 text-right ${holding.change24h >= 0 ? 'text-profit' : 'text-loss'}`}>
-                  {holding.change24h >= 0 ? '+' : ''}{holding.change24h.toFixed(2)}%
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {filteredAndSortedHoldings.length > 10 && (
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setShowAllHoldings(!showAllHoldings)}
-                className="text-sm text-primary-400 hover:text-primary-300"
-              >
-                {showAllHoldings ? 'Show top 10' : `View all ${filteredAndSortedHoldings.length} assets`}
-              </button>
-            </div>
+              {filteredAndSortedHoldings.length > 10 && (
+                <div className="mt-4 text-center">
+                  <Button
+                    onClick={() => setShowAllHoldings(!showAllHoldings)}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    {showAllHoldings ? 'Show top 10' : `View all ${filteredAndSortedHoldings.length} assets`}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-
-          {filteredAndSortedHoldings.length === 0 && searchQuery && (
-            <div className="text-center py-8 text-surface-400">
-              No assets found matching "{searchQuery}"
-            </div>
-          )}
-        </div>
+        </Card>
       )}
 
       {/* Holdings by Exchange */}
       {hasData && holdings.some(h => h.sources.length > 1) && (
-        <div className="card p-6">
+        <Card className="p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Holdings by Exchange</h2>
           <div className="space-y-4">
             {holdings.filter(h => h.sources.length > 1).slice(0, 5).map((holding) => (
               <div key={holding.symbol} className="bg-surface-800 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
+                    <AssetAvatar symbol={holding.symbol} size="sm" />
                     <span className="font-medium text-surface-100">{holding.symbol}</span>
-                    <span className="text-xs text-surface-500">
-                      ({holding.sources.length} exchanges)
-                    </span>
+                    <Badge size="sm">{holding.sources.length} exchanges</Badge>
                   </div>
-                  <span className="text-surface-400">
+                  <span className="text-surface-400 font-tabular">
                     Total: {formatAmount(holding.totalAmount.toNumber())}
                   </span>
                 </div>
@@ -350,10 +342,10 @@ export function PortfolioPage() {
                       key={`${source.exchangeId}-${idx}`}
                       className="flex justify-between text-sm"
                     >
-                      <span className="text-surface-400">
-                        {source.exchangeName}
-                        <span className="text-surface-600 ml-1">({source.balanceType})</span>
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-surface-400">{source.exchangeName}</span>
+                        <Badge size="sm" variant="default">{source.balanceType}</Badge>
+                      </div>
                       <span className="text-surface-300 font-tabular">
                         {formatAmount(source.amount.toNumber())}
                       </span>
@@ -363,7 +355,7 @@ export function PortfolioPage() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
