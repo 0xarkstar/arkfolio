@@ -5,6 +5,7 @@ import {
   ExchangeList,
   BalancesTable,
   PositionsTable,
+  TransactionsTable,
 } from './components';
 
 export function ExchangesPage() {
@@ -49,6 +50,9 @@ export function ExchangesPage() {
 
       {/* Balances */}
       <BalancesTable />
+
+      {/* Transaction History */}
+      <TransactionsTable />
 
       {/* Add Exchange Modal */}
       <AddExchangeModal
