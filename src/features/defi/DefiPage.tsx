@@ -98,6 +98,27 @@ const mockPoints = [
   { id: '4', protocol: 'Blast', walletAddress: '', pointsBalance: new Decimal(15000), estimatedValueUsd: null, lastSync: null },
 ];
 
+const POSITION_TYPES = [
+  { value: 'lending', label: 'Lending' },
+  { value: 'borrowing', label: 'Borrowing' },
+  { value: 'lp', label: 'Liquidity Pool' },
+  { value: 'staking', label: 'Staking' },
+  { value: 'vault', label: 'Vault' },
+  { value: 'pt', label: 'Principal Token (PT)' },
+  { value: 'yt', label: 'Yield Token (YT)' },
+  { value: 'restaking', label: 'Restaking' },
+];
+
+const CHAINS = ['Ethereum', 'Arbitrum', 'Optimism', 'Base', 'Polygon', 'BSC', 'Avalanche', 'Solana'];
+
+const PROTOCOLS = [
+  'Aave V3', 'Compound', 'Morpho', 'Spark', // Lending
+  'Uniswap V3', 'Uniswap V2', 'SushiSwap', 'Curve', 'Balancer', // DEX
+  'Pendle', 'Convex', 'Yearn', // Yield
+  'EigenLayer', 'Lido', 'Rocket Pool', // Staking
+  'Other',
+];
+
 export function DefiPage() {
   const {
     positions: storePositions,
@@ -108,9 +129,89 @@ export function DefiPage() {
     getTotalValueUsd,
     getAverageApy,
     getLowestHealthFactor,
+    addPosition,
+    removePosition,
   } = useDefiStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  // Form state
+  const [formProtocol, setFormProtocol] = useState('Aave V3');
+  const [formType, setFormType] = useState<DefiPosition['positionType']>('lending');
+  const [formChain, setFormChain] = useState('Ethereum');
+  const [formAssets, setFormAssets] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [formValue, setFormValue] = useState('');
+  const [formCostBasis, setFormCostBasis] = useState('');
+  const [formApy, setFormApy] = useState('');
+  const [formHealthFactor, setFormHealthFactor] = useState('');
+
+  const resetForm = () => {
+    setFormProtocol('Aave V3');
+    setFormType('lending');
+    setFormChain('Ethereum');
+    setFormAssets('');
+    setFormAmount('');
+    setFormValue('');
+    setFormCostBasis('');
+    setFormApy('');
+    setFormHealthFactor('');
+    setAddError(null);
+  };
+
+  const handleAddPosition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAdding(true);
+    setAddError(null);
+
+    try {
+      const assets = formAssets.split(',').map(a => a.trim().toUpperCase()).filter(a => a);
+      const amount = parseFloat(formAmount) || 0;
+      const value = parseFloat(formValue) || 0;
+      const costBasis = parseFloat(formCostBasis) || value;
+      const apy = formApy ? parseFloat(formApy) : null;
+      const healthFactor = formHealthFactor ? parseFloat(formHealthFactor) : null;
+
+      if (assets.length === 0) {
+        throw new Error('Please enter at least one asset');
+      }
+
+      if (value <= 0) {
+        throw new Error('Please enter a valid current value');
+      }
+
+      await addPosition({
+        walletId: 'manual',
+        protocol: formProtocol,
+        positionType: formType,
+        poolAddress: null,
+        assets,
+        amounts: [new Decimal(amount)],
+        costBasisUsd: new Decimal(costBasis),
+        currentValueUsd: new Decimal(value),
+        rewardsEarned: {},
+        apy,
+        maturityDate: null,
+        healthFactor,
+        chain: formChain,
+      });
+
+      setShowAddModal(false);
+      resetForm();
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'Failed to add position');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleRemovePosition = async (id: string) => {
+    if (confirm('Remove this position?')) {
+      await removePosition(id);
+    }
+  };
 
   useEffect(() => {
     loadPositions();
@@ -264,6 +365,7 @@ export function DefiPage() {
                   <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
                     Health
                   </th>
+                  <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -315,6 +417,17 @@ export function DefiPage() {
                         </span>
                       ) : (
                         <span className="text-surface-500">-</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      {position.walletId === 'manual' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemovePosition(position.id); }}
+                          className="text-surface-500 hover:text-loss transition-colors"
+                          title="Remove position"
+                        >
+                          &times;
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -449,29 +562,178 @@ export function DefiPage() {
       {/* Add Position Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md p-6">
+          <div className="card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-surface-100">Add DeFi Position</h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { setShowAddModal(false); resetForm(); }}
                 className="text-surface-400 hover:text-surface-100 text-2xl"
               >
                 &times;
               </button>
             </div>
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4">&#128679;</div>
-              <p className="text-surface-400 mb-2">Manual position entry coming soon</p>
-              <p className="text-surface-500 text-sm">
-                Automatic detection via wallet address will be available in a future update.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="btn-secondary w-full mt-4"
-            >
-              Close
-            </button>
+
+            {addError && (
+              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
+                {addError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddPosition} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Protocol
+                  </label>
+                  <select
+                    value={formProtocol}
+                    onChange={(e) => setFormProtocol(e.target.value)}
+                    className="input w-full"
+                  >
+                    {PROTOCOLS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Position Type
+                  </label>
+                  <select
+                    value={formType}
+                    onChange={(e) => setFormType(e.target.value as DefiPosition['positionType'])}
+                    className="input w-full"
+                  >
+                    {POSITION_TYPES.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1">
+                  Chain
+                </label>
+                <select
+                  value={formChain}
+                  onChange={(e) => setFormChain(e.target.value)}
+                  className="input w-full"
+                >
+                  {CHAINS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1">
+                  Assets (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={formAssets}
+                  onChange={(e) => setFormAssets(e.target.value)}
+                  placeholder="ETH, USDC"
+                  className="input w-full"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Amount (primary asset)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Current Value (USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formValue}
+                    onChange={(e) => setFormValue(e.target.value)}
+                    placeholder="0.00"
+                    className="input w-full"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Cost Basis (USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formCostBasis}
+                    onChange={(e) => setFormCostBasis(e.target.value)}
+                    placeholder="Optional"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    APY (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formApy}
+                    onChange={(e) => setFormApy(e.target.value)}
+                    placeholder="Optional"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1">
+                    Health Factor
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formHealthFactor}
+                    onChange={(e) => setFormHealthFactor(e.target.value)}
+                    placeholder="Optional"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddModal(false); resetForm(); }}
+                  className="btn-secondary flex-1"
+                  disabled={isAdding}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={isAdding}
+                >
+                  {isAdding ? 'Adding...' : 'Add Position'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
