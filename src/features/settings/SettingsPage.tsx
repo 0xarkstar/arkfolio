@@ -8,12 +8,18 @@ import {
   positions as positionsTable,
   wallets as walletsTable,
   transactions as transactionsTable,
+  onchainAssets as onchainAssetsTable,
+  defiPositions as defiPositionsTable,
+  points as pointsTable,
+  taxReports as taxReportsTable,
+  priceHistory as priceHistoryTable,
 } from '../../database/schema';
 
 export function SettingsPage() {
   const { settings, isLoading, isSaving, loadSettings, updateSetting } = useSettingsStore();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -62,11 +68,102 @@ export function SettingsPage() {
     }
   };
 
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportStatus('Importing...');
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.version || !data.exportedAt) {
+        throw new Error('Invalid backup file format');
+      }
+
+      const db = getDb();
+
+      // Import exchanges (skip settings and sensitive data)
+      if (data.exchanges?.length > 0) {
+        for (const exchange of data.exchanges) {
+          await db.insert(exchangesTable).values({
+            ...exchange,
+            apiKeyRef: null, // Don't restore API keys
+            apiSecretRef: null,
+            passphraseRef: null,
+          }).onConflictDoNothing();
+        }
+      }
+
+      // Import wallets
+      if (data.wallets?.length > 0) {
+        for (const wallet of data.wallets) {
+          await db.insert(walletsTable).values(wallet).onConflictDoNothing();
+        }
+      }
+
+      // Import transactions
+      if (data.transactions?.length > 0) {
+        for (const tx of data.transactions) {
+          await db.insert(transactionsTable).values(tx).onConflictDoNothing();
+        }
+      }
+
+      setImportStatus('Import complete! Reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Import failed:', error);
+      setImportStatus('Import failed: Invalid file');
+      setTimeout(() => setImportStatus(null), 3000);
+    }
+
+    // Reset file input
+    event.target.value = '';
+  };
+
+  const [isClearing, setIsClearing] = useState(false);
+
   const handleClearData = async () => {
-    // This would need to clear all data from the database
-    // For safety, just close the modal for now
-    setShowClearConfirm(false);
-    alert('This feature is not yet implemented for safety reasons.');
+    setIsClearing(true);
+    try {
+      const db = getDb();
+
+      // Delete all data from all tables (order matters due to foreign keys)
+      await db.delete(onchainAssetsTable);
+      await db.delete(defiPositionsTable);
+      await db.delete(pointsTable);
+      await db.delete(taxReportsTable);
+      await db.delete(priceHistoryTable);
+      await db.delete(transactionsTable);
+      await db.delete(positionsTable);
+      await db.delete(balancesTable);
+      await db.delete(walletsTable);
+      await db.delete(exchangesTable);
+      // Keep settings, just reset them
+
+      // Clear encrypted credentials from safe storage
+      if (window.electronAPI) {
+        try {
+          const keys = await window.electronAPI.safeStorage.list();
+          for (const key of keys) {
+            await window.electronAPI.safeStorage.delete(key);
+          }
+        } catch {
+          // Safe storage might not be fully available
+        }
+      }
+
+      setShowClearConfirm(false);
+      // Reload the page to reset all state
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to clear data:', error);
+      alert('Failed to clear data. Please try again.');
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   if (isLoading) {
@@ -264,6 +361,23 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div>
+              <p className="font-medium text-surface-100">Import Data</p>
+              <p className="text-sm text-surface-400">Restore data from a backup file</p>
+            </div>
+            <label className="btn-secondary text-sm cursor-pointer">
+              {importStatus || 'Import'}
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportData}
+                className="hidden"
+                disabled={!!importStatus}
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
               <p className="font-medium text-surface-100">Clear All Data</p>
               <p className="text-sm text-surface-400">Delete all local data permanently</p>
             </div>
@@ -306,14 +420,16 @@ export function SettingsPage() {
               <button
                 onClick={() => setShowClearConfirm(false)}
                 className="btn-secondary"
+                disabled={isClearing}
               >
                 Cancel
               </button>
               <button
                 onClick={handleClearData}
-                className="px-4 py-2 bg-loss hover:bg-loss/80 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-loss hover:bg-loss/80 text-white rounded-lg transition-colors disabled:opacity-50"
+                disabled={isClearing}
               >
-                Clear All Data
+                {isClearing ? 'Clearing...' : 'Clear All Data'}
               </button>
             </div>
           </div>
