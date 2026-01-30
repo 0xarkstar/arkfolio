@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { PortfolioChart } from '../../components/charts';
+import { toast } from '../../components/Toast';
+
+type SortField = 'value' | 'change' | 'name' | 'amount';
+type SortDirection = 'asc' | 'desc';
 
 export function PortfolioPage() {
   const { summary, holdings, allocations, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
   const { accounts } = useExchangeStore();
   const [showAllHoldings, setShowAllHoldings] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('value');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Refresh portfolio on mount and when accounts change
   useEffect(() => {
@@ -15,58 +22,169 @@ export function PortfolioPage() {
 
   const hasData = holdings.length > 0;
   const connectedExchanges = accounts.filter(a => a.isConnected).length;
-  const displayedHoldings = showAllHoldings ? holdings : holdings.slice(0, 10);
+
+  // Filter and sort holdings
+  const filteredAndSortedHoldings = useMemo(() => {
+    let filtered = holdings;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = holdings.filter(
+        h => h.symbol.toLowerCase().includes(query) || h.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'value':
+          comparison = a.valueUsd.minus(b.valueUsd).toNumber();
+          break;
+        case 'change':
+          comparison = a.change24h - b.change24h;
+          break;
+        case 'name':
+          comparison = a.symbol.localeCompare(b.symbol);
+          break;
+        case 'amount':
+          comparison = a.totalAmount.minus(b.totalAmount).toNumber();
+          break;
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+    return sorted;
+  }, [holdings, sortField, sortDirection, searchQuery]);
+
+  const displayedHoldings = showAllHoldings ? filteredAndSortedHoldings : filteredAndSortedHoldings.slice(0, 10);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <span className={`ml-1 ${sortField === field ? 'text-primary-400' : 'text-surface-600'}`}>
+      {sortField === field ? (sortDirection === 'desc' ? '↓' : '↑') : '↕'}
+    </span>
+  );
+
+  const handleExportCSV = () => {
+    if (holdings.length === 0) {
+      toast.error('No holdings to export');
+      return;
+    }
+
+    const headers = ['Symbol', 'Name', 'Amount', 'Value (USD)', '24h Change (%)'];
+    const rows = holdings.map(h => [
+      h.symbol,
+      h.name,
+      h.totalAmount.toString(),
+      h.valueUsd.toFixed(2),
+      h.change24h.toFixed(2),
+    ]);
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `portfolio-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Portfolio exported to CSV');
+  };
 
   return (
     <div className="space-y-6">
       {/* Portfolio Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-6 md:col-span-2">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-surface-400 mb-1">Total Portfolio Value</p>
-              <p className="text-4xl font-bold text-surface-100 font-tabular">
-                {formatCurrency(summary.totalValueUsd.toNumber())}
-              </p>
-              <p className={`text-sm mt-2 ${summary.change24hPercent >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {summary.change24hPercent >= 0 ? '+' : ''}
-                {formatCurrency(summary.change24hUsd.toNumber())}
-                {' '}({summary.change24hPercent >= 0 ? '+' : ''}{summary.change24hPercent.toFixed(2)}%) 24h
-              </p>
+        {isLoading && !hasData ? (
+          <>
+            <div className="card p-6 md:col-span-2 animate-pulse">
+              <div className="h-4 w-32 bg-surface-700 rounded mb-2" />
+              <div className="h-10 w-48 bg-surface-600 rounded mb-2" />
+              <div className="h-4 w-40 bg-surface-700 rounded" />
             </div>
-            <div className="text-right">
-              <p className="text-xs text-surface-500">Last updated</p>
-              <p className="text-sm text-surface-400">
-                {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Never'}
-              </p>
-              <button
-                onClick={() => refreshPortfolio()}
-                disabled={isLoading}
-                className="mt-2 text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
-              >
-                {isLoading ? 'Refreshing...' : 'Refresh'}
-              </button>
+            <div className="card p-6 animate-pulse">
+              <div className="h-4 w-24 bg-surface-700 rounded mb-4" />
+              <div className="space-y-3">
+                <div className="h-4 bg-surface-700 rounded" />
+                <div className="h-4 bg-surface-700 rounded" />
+                <div className="h-4 bg-surface-700 rounded" />
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="card p-6 md:col-span-2">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-surface-400 mb-1">Total Portfolio Value</p>
+                  <p className="text-4xl font-bold text-surface-100 font-tabular">
+                    {formatCurrency(summary.totalValueUsd.toNumber())}
+                  </p>
+                  <p className={`text-sm mt-2 ${summary.change24hPercent >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {summary.change24hPercent >= 0 ? '+' : ''}
+                    {formatCurrency(summary.change24hUsd.toNumber())}
+                    {' '}({summary.change24hPercent >= 0 ? '+' : ''}{summary.change24hPercent.toFixed(2)}%) 24h
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-surface-500">Last updated</p>
+                  <p className="text-sm text-surface-400">
+                    {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Never'}
+                  </p>
+                  <div className="flex gap-2 mt-2 justify-end">
+                    <button
+                      onClick={() => refreshPortfolio()}
+                      disabled={isLoading}
+                      className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+                    >
+                      {isLoading ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                    {hasData && (
+                      <>
+                        <span className="text-surface-600">|</span>
+                        <button
+                          onClick={handleExportCSV}
+                          className="text-xs text-primary-400 hover:text-primary-300"
+                        >
+                          Export CSV
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        <div className="card p-6">
-          <p className="text-sm text-surface-400 mb-4">Quick Stats</p>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-surface-400">Assets</span>
-              <span className="text-surface-100 font-medium">{summary.totalAssets}</span>
+            <div className="card p-6">
+              <p className="text-sm text-surface-400 mb-4">Quick Stats</p>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Assets</span>
+                  <span className="text-surface-100 font-medium">{summary.totalAssets}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Positions</span>
+                  <span className="text-surface-100 font-medium">{summary.totalPositions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Exchanges</span>
+                  <span className="text-surface-100 font-medium">{connectedExchanges}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-surface-400">Positions</span>
-              <span className="text-surface-100 font-medium">{summary.totalPositions}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-surface-400">Exchanges</span>
-              <span className="text-surface-100 font-medium">{connectedExchanges}</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Empty State */}
@@ -123,7 +241,42 @@ export function PortfolioPage() {
       {/* Top Holdings */}
       {hasData && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-surface-100 mb-4">Top Holdings</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-100">
+              Holdings
+              {searchQuery && ` (${filteredAndSortedHoldings.length} results)`}
+            </h2>
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search assets..."
+                className="input py-1 text-sm w-40"
+              />
+              <div className="flex items-center gap-2 text-xs text-surface-400">
+                <span>Sort:</span>
+                <button
+                  onClick={() => handleSort('name')}
+                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'name' ? 'text-primary-400' : ''}`}
+                >
+                  Name<SortIcon field="name" />
+                </button>
+                <button
+                  onClick={() => handleSort('value')}
+                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'value' ? 'text-primary-400' : ''}`}
+                >
+                  Value<SortIcon field="value" />
+                </button>
+                <button
+                  onClick={() => handleSort('change')}
+                  className={`px-2 py-1 rounded hover:bg-surface-800 ${sortField === 'change' ? 'text-primary-400' : ''}`}
+                >
+                  24h<SortIcon field="change" />
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="space-y-3">
             {displayedHoldings.map((holding) => (
               <div
@@ -154,14 +307,20 @@ export function PortfolioPage() {
             ))}
           </div>
 
-          {holdings.length > 10 && (
+          {filteredAndSortedHoldings.length > 10 && (
             <div className="mt-4 text-center">
               <button
                 onClick={() => setShowAllHoldings(!showAllHoldings)}
                 className="text-sm text-primary-400 hover:text-primary-300"
               >
-                {showAllHoldings ? 'Show top 10' : `View all ${holdings.length} assets`}
+                {showAllHoldings ? 'Show top 10' : `View all ${filteredAndSortedHoldings.length} assets`}
               </button>
+            </div>
+          )}
+
+          {filteredAndSortedHoldings.length === 0 && searchQuery && (
+            <div className="text-center py-8 text-surface-400">
+              No assets found matching "{searchQuery}"
             </div>
           )}
         </div>
