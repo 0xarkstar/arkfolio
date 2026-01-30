@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useWatchlistStore, WatchlistItem } from '../stores/watchlistStore';
 import { toast } from './Toast';
 import { ConfirmDialog } from './ConfirmDialog';
+import { Card } from './Card';
+import { Button } from './Button';
+import { Input } from './Input';
+import { Modal } from './Modal';
+import { SkeletonAssetRow } from './Skeleton';
 
 // Common crypto assets for quick add
 const POPULAR_ASSETS = [
@@ -113,7 +118,7 @@ export function Watchlist() {
   };
 
   return (
-    <div className="card p-6">
+    <Card className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-surface-100">Watchlist</h2>
@@ -125,51 +130,44 @@ export function Watchlist() {
         </div>
         <div className="flex items-center gap-3">
           {items.length > 0 && (
-            <button
+            <Button
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="text-xs text-surface-400 hover:text-surface-300 disabled:opacity-50"
+              variant="ghost"
+              size="xs"
+              loading={isRefreshing}
             >
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+              Refresh
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => setShowAddModal(true)}
-            className="text-sm text-primary-400 hover:text-primary-300"
+            variant="ghost"
+            size="sm"
           >
             + Add
-          </button>
+          </Button>
         </div>
       </div>
 
       {isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center justify-between py-2 px-3 bg-surface-800 rounded-lg animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-surface-700 rounded-full" />
-                <div>
-                  <div className="h-4 w-12 bg-surface-700 rounded" />
-                  <div className="h-3 w-16 bg-surface-700 rounded mt-1" />
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="h-4 w-16 bg-surface-700 rounded" />
-                <div className="h-3 w-10 bg-surface-700 rounded mt-1" />
-              </div>
-            </div>
+            <SkeletonAssetRow key={i} />
           ))}
         </div>
       ) : items.length === 0 ? (
         <div className="py-8 text-center">
           <div className="text-3xl mb-2">&#9734;</div>
           <p className="text-surface-400 text-sm">No assets in watchlist</p>
-          <button
+          <Button
             onClick={() => setShowAddModal(true)}
-            className="mt-3 text-sm text-primary-400 hover:text-primary-300"
+            variant="ghost"
+            size="sm"
+            className="mt-3"
           >
             Add your first asset
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -215,65 +213,56 @@ export function Watchlist() {
       )}
 
       {/* Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-surface-100">Add to Watchlist</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-surface-400 hover:text-surface-100 text-xl"
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add to Watchlist"
+        size="md"
+      >
+        {/* Quick Add */}
+        <div className="mb-6">
+          <p className="text-sm text-surface-400 mb-3">Popular Assets</p>
+          <div className="grid grid-cols-4 gap-2">
+            {POPULAR_ASSETS.filter(a => !isInWatchlist(a.symbol)).slice(0, 8).map((asset) => (
+              <Button
+                key={asset.symbol}
+                onClick={() => handleQuickAdd(asset.symbol, asset.name)}
+                variant="secondary"
+                size="sm"
               >
-                ×
-              </button>
-            </div>
-
-            {/* Quick Add */}
-            <div className="mb-6">
-              <p className="text-sm text-surface-400 mb-3">Popular Assets</p>
-              <div className="grid grid-cols-4 gap-2">
-                {POPULAR_ASSETS.filter(a => !isInWatchlist(a.symbol)).slice(0, 8).map((asset) => (
-                  <button
-                    key={asset.symbol}
-                    onClick={() => handleQuickAdd(asset.symbol, asset.name)}
-                    className="px-3 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm text-surface-300 transition-colors"
-                  >
-                    {asset.symbol}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Add */}
-            <div className="border-t border-surface-700 pt-4">
-              <p className="text-sm text-surface-400 mb-3">Or add custom asset</p>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={customSymbol}
-                  onChange={(e) => setCustomSymbol(e.target.value.toUpperCase())}
-                  placeholder="Symbol (e.g., DOGE)"
-                  className="input w-full"
-                />
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Name (optional)"
-                  className="input w-full"
-                />
-                <button
-                  onClick={handleAddCustom}
-                  disabled={!customSymbol.trim()}
-                  className="btn-primary w-full"
-                >
-                  Add to Watchlist
-                </button>
-              </div>
-            </div>
+                {asset.symbol}
+              </Button>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* Custom Add */}
+        <div className="border-t border-surface-700 pt-4">
+          <p className="text-sm text-surface-400 mb-3">Or add custom asset</p>
+          <div className="space-y-3">
+            <Input
+              type="text"
+              value={customSymbol}
+              onChange={(e) => setCustomSymbol(e.target.value.toUpperCase())}
+              placeholder="Symbol (e.g., DOGE)"
+            />
+            <Input
+              type="text"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              placeholder="Name (optional)"
+            />
+            <Button
+              onClick={handleAddCustom}
+              disabled={!customSymbol.trim()}
+              variant="primary"
+              className="w-full"
+            >
+              Add to Watchlist
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Remove Confirm Dialog */}
       <ConfirmDialog
@@ -285,6 +274,6 @@ export function Watchlist() {
         onConfirm={confirmRemove}
         onCancel={() => setItemToRemove(null)}
       />
-    </div>
+    </Card>
   );
 }
