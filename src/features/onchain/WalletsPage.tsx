@@ -3,6 +3,17 @@ import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
 import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { Card } from '../../components/Card';
+import { Button } from '../../components/Button';
+import { SearchInput } from '../../components/SearchInput';
+import { Select, Input } from '../../components/Input';
+import { ChainAvatar, AssetAvatar } from '../../components/Avatar';
+import { Badge } from '../../components/Badge';
+import { CopyButton } from '../../components/CopyButton';
+import { Alert } from '../../components/Alert';
+import { Modal, ModalFooter } from '../../components/Modal';
+import { SkeletonCard } from '../../components/Skeleton';
+import { NoConnectionEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 
 type SortField = 'label' | 'chain' | 'value' | 'assets';
 type SortDirection = 'asc' | 'desc';
@@ -206,117 +217,96 @@ export function WalletsPage() {
     return value.toFixed(8);
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Address copied to clipboard');
-    } catch {
-      toast.error('Failed to copy address');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {isLoading && wallets.length === 0 ? (
           <>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-28 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-32 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-12 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-12 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-12 bg-surface-600 rounded" />
-            </div>
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
           </>
         ) : (
           <>
-            <div className="card p-4">
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Total On-chain Value</p>
               <p className="text-2xl font-bold text-surface-100 font-tabular">
                 {formatCurrency(totalValue.toNumber())}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Wallets</p>
               <p className="text-2xl font-bold text-surface-100">{wallets.length}</p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Chains</p>
               <p className="text-2xl font-bold text-surface-100">{uniqueChains}</p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Total Tokens</p>
               <p className="text-2xl font-bold text-surface-100">{totalTokens}</p>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Wallets List */}
-      <div className="card p-6">
+      <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h2 className="text-lg font-semibold text-surface-100">
             Connected Wallets
-            {(searchQuery || filterChain !== 'all') &&
-              ` (${filteredAndSortedWallets.length} of ${wallets.length})`}
+            {(searchQuery || filterChain !== 'all') && (
+              <span className="text-surface-400 font-normal text-sm ml-2">
+                ({filteredAndSortedWallets.length} of {wallets.length})
+              </span>
+            )}
           </h2>
           <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="text"
+            <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder="Search..."
-              className="input py-1.5 text-sm w-32"
+              size="sm"
+              className="w-32"
             />
-            <select
+            <Select
               value={filterChain}
               onChange={(e) => setFilterChain(e.target.value)}
-              className="input py-1.5 text-sm"
-            >
-              <option value="all">All Chains</option>
-              {walletsChains.map(chain => (
-                <option key={chain} value={chain}>
-                  {CHAIN_CONFIGS[chain]?.name || chain}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: 'all', label: 'All Chains' },
+                ...walletsChains.map(chain => ({
+                  value: chain,
+                  label: CHAIN_CONFIGS[chain]?.name || chain,
+                })),
+              ]}
+              size="sm"
+              className="w-32"
+            />
+            <Select
               value={`${sortField}-${sortDirection}`}
               onChange={(e) => {
                 const [field, dir] = e.target.value.split('-');
                 setSortField(field as SortField);
                 setSortDirection(dir as SortDirection);
               }}
-              className="input py-1.5 text-sm"
-            >
-              <option value="value-desc">Value: High to Low</option>
-              <option value="value-asc">Value: Low to High</option>
-              <option value="label-asc">Name: A to Z</option>
-              <option value="label-desc">Name: Z to A</option>
-              <option value="chain-asc">Chain: A to Z</option>
-              <option value="assets-desc">Assets: Most First</option>
-            </select>
+              options={[
+                { value: 'value-desc', label: 'Value: High to Low' },
+                { value: 'value-asc', label: 'Value: Low to High' },
+                { value: 'label-asc', label: 'Name: A to Z' },
+                { value: 'label-desc', label: 'Name: Z to A' },
+                { value: 'chain-asc', label: 'Chain: A to Z' },
+                { value: 'assets-desc', label: 'Assets: Most First' },
+              ]}
+              size="sm"
+              className="w-40"
+            />
             {wallets.length > 0 && (
-              <button
-                onClick={handleExportCSV}
-                className="text-xs text-primary-400 hover:text-primary-300"
-              >
+              <Button onClick={handleExportCSV} variant="ghost" size="xs">
                 Export CSV
-              </button>
+              </Button>
             )}
-            <button onClick={() => setIsAddModalOpen(true)} className="btn-primary text-sm">
+            <Button onClick={() => setIsAddModalOpen(true)} size="sm">
               Add Wallet
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -325,26 +315,15 @@ export function WalletsPage() {
             <div className="text-surface-400">Loading wallets...</div>
           </div>
         ) : wallets.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">&#128091;</div>
-            <p className="text-surface-400 mb-4">No wallets connected</p>
-            <button onClick={() => setIsAddModalOpen(true)} className="btn-secondary">
-              Add Your First Wallet
-            </button>
-          </div>
+          <NoConnectionEmptyState onConnect={() => setIsAddModalOpen(true)} />
         ) : filteredAndSortedWallets.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-surface-400 mb-2">No wallets match your filters</p>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterChain('all');
-              }}
-              className="text-sm text-primary-400 hover:text-primary-300"
-            >
-              Clear all filters
-            </button>
-          </div>
+          <NoResultsEmptyState
+            searchTerm={searchQuery}
+            onClear={() => {
+              setSearchQuery('');
+              setFilterChain('all');
+            }}
+          />
         ) : (
           <div className="space-y-3">
             {filteredAndSortedWallets.map((wallet) => (
@@ -358,43 +337,22 @@ export function WalletsPage() {
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-primary-400 font-medium">
-                    {CHAIN_CONFIGS[wallet.chain]?.name[0] || wallet.chain[0].toUpperCase()}
-                  </div>
+                  <ChainAvatar chain={wallet.chain} size="md" />
                   <div>
                     <p className="font-medium text-surface-100">{wallet.label}</p>
                     <div className="flex items-center gap-1">
                       <p className="text-sm text-surface-400 font-mono">
                         {formatAddress(wallet.address)}
                       </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard(wallet.address);
-                        }}
-                        className="p-0.5 text-surface-500 hover:text-surface-300 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Copy address"
+                      <span
+                        onClick={(e) => e.stopPropagation()}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                      </button>
+                        <CopyButton text={wallet.address} iconSize={12} />
+                      </span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 bg-surface-700 rounded text-xs text-surface-300">
-                    {CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain}
-                  </span>
+                  <Badge size="sm">{CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain}</Badge>
                 </div>
                 <div className="text-right">
                   {wallet.isLoading ? (
@@ -416,29 +374,32 @@ export function WalletsPage() {
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Selected Wallet Details */}
       {selectedWallet && (
-        <div className="card p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-surface-100">
               {selectedWallet.label} Details
             </h2>
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={() => syncWallet(selectedWallet.id)}
                 disabled={selectedWallet.isLoading}
-                className="btn-secondary text-sm"
+                variant="secondary"
+                size="sm"
+                loading={selectedWallet.isLoading}
               >
-                {selectedWallet.isLoading ? 'Syncing...' : 'Refresh'}
-              </button>
-              <button
+                Refresh
+              </Button>
+              <Button
                 onClick={() => handleRemoveWallet(selectedWallet)}
-                className="px-3 py-1.5 bg-loss/20 hover:bg-loss/30 text-loss rounded text-sm transition-colors"
+                variant="danger"
+                size="sm"
               >
                 Remove
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -446,26 +407,7 @@ export function WalletsPage() {
             <p className="text-sm text-surface-400">Address</p>
             <div className="flex items-center gap-2">
               <p className="font-mono text-surface-200">{selectedWallet.address}</p>
-              <button
-                onClick={() => copyToClipboard(selectedWallet.address)}
-                className="p-1 text-surface-400 hover:text-surface-200 transition-colors"
-                title="Copy address"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              </button>
+              <CopyButton text={selectedWallet.address} />
             </div>
           </div>
 
@@ -476,9 +418,7 @@ export function WalletsPage() {
                 <h3 className="text-sm font-medium text-surface-300 mb-2">Native Balance</h3>
                 <div className="flex items-center justify-between p-3 bg-surface-800 rounded">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
-                      {selectedWallet.nativeBalance.symbol.slice(0, 2)}
-                    </div>
+                    <AssetAvatar symbol={selectedWallet.nativeBalance.symbol} size="sm" />
                     <span className="font-medium text-surface-100">
                       {selectedWallet.nativeBalance.symbol}
                     </span>
@@ -508,9 +448,7 @@ export function WalletsPage() {
                     className="flex items-center justify-between p-3 bg-surface-800 rounded"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-surface-700 rounded-full flex items-center justify-center text-xs font-medium">
-                        {token.token.symbol.slice(0, 2)}
-                      </div>
+                      <AssetAvatar symbol={token.token.symbol} size="sm" />
                       <div>
                         <p className="font-medium text-surface-100">{token.token.symbol}</p>
                         <p className="text-xs text-surface-500">{token.token.name}</p>
@@ -537,11 +475,11 @@ export function WalletsPage() {
             selectedWallet.tokenBalances.length === 0 && (
               <p className="text-surface-400 text-center py-4">No assets found</p>
             )}
-        </div>
+        </Card>
       )}
 
       {/* Supported Chains */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Supported Chains</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {SUPPORTED_CHAINS.map((chain) => (
@@ -549,107 +487,78 @@ export function WalletsPage() {
               key={chain.id}
               className="flex flex-col items-center p-4 bg-surface-800 rounded-lg"
             >
-              <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-primary-400 font-bold mb-2">
-                {chain.icon}
-              </div>
+              <ChainAvatar chain={chain.id} size="md" className="mb-2" />
               <p className="text-sm text-surface-300">{chain.name}</p>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* Add Wallet Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-surface-100">Add Wallet</h2>
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setAddError(null);
-                }}
-                className="text-surface-400 hover:text-surface-100 text-2xl"
-              >
-                &times;
-              </button>
-            </div>
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddError(null);
+        }}
+        title="Add Wallet"
+        size="md"
+      >
+        {addError && (
+          <Alert variant="error" className="mb-4" dismissible onDismiss={() => setAddError(null)}>
+            {addError}
+          </Alert>
+        )}
 
-            {addError && (
-              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
-                {addError}
-              </div>
-            )}
+        <form onSubmit={handleAddWallet} className="space-y-4">
+          <Select
+            label="Chain"
+            value={newWalletChain}
+            onChange={(e) => setNewWalletChain(e.target.value as Chain)}
+            options={SUPPORTED_CHAINS.map((chain) => ({
+              value: chain.id,
+              label: chain.name,
+            }))}
+          />
 
-            <form onSubmit={handleAddWallet} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Chain
-                </label>
-                <select
-                  value={newWalletChain}
-                  onChange={(e) => setNewWalletChain(e.target.value as Chain)}
-                  className="input w-full"
-                >
-                  {SUPPORTED_CHAINS.map((chain) => (
-                    <option key={chain.id} value={chain.id}>
-                      {chain.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <Input
+            label="Wallet Address"
+            value={newWalletAddress}
+            onChange={(e) => setNewWalletAddress(e.target.value)}
+            className="font-mono"
+            placeholder="0x..."
+            required
+          />
 
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Wallet Address
-                </label>
-                <input
-                  type="text"
-                  value={newWalletAddress}
-                  onChange={(e) => setNewWalletAddress(e.target.value)}
-                  className="input w-full font-mono"
-                  placeholder="0x..."
-                  required
-                />
-              </div>
+          <Input
+            label="Label (Optional)"
+            value={newWalletLabel}
+            onChange={(e) => setNewWalletLabel(e.target.value)}
+            placeholder="My Main Wallet"
+          />
 
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Label (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newWalletLabel}
-                  onChange={(e) => setNewWalletLabel(e.target.value)}
-                  className="input w-full"
-                  placeholder="My Main Wallet"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setAddError(null);
-                  }}
-                  className="btn-secondary flex-1"
-                  disabled={isAdding}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex-1"
-                  disabled={isAdding || !newWalletAddress}
-                >
-                  {isAdding ? 'Adding...' : 'Add Wallet'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          <ModalFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setAddError(null);
+              }}
+              variant="secondary"
+              disabled={isAdding}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isAdding || !newWalletAddress}
+              loading={isAdding}
+            >
+              Add Wallet
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       {/* Remove Wallet Confirm Dialog */}
       <ConfirmDialog
