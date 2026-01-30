@@ -4,6 +4,13 @@ import { transactions } from '../../../database/schema';
 import { desc } from 'drizzle-orm';
 import { useExchangeStore } from '../../../stores/exchangeStore';
 import { toast } from '../../../components/Toast';
+import { Card } from '../../../components/Card';
+import { SearchInput } from '../../../components/SearchInput';
+import { Button } from '../../../components/Button';
+import { Badge } from '../../../components/Badge';
+import { AssetAvatar } from '../../../components/Avatar';
+import { NoDataEmptyState, NoResultsEmptyState } from '../../../components/EmptyState';
+import { SkeletonTableRow } from '../../../components/Skeleton';
 
 interface Transaction {
   id: string;
@@ -64,18 +71,18 @@ export function TransactionsTable() {
     return account?.name || exchangeId;
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeVariant = (type: string): 'success' | 'danger' | 'info' | 'warning' | 'default' => {
     switch (type.toLowerCase()) {
       case 'buy':
-        return 'bg-profit/20 text-profit';
+        return 'success';
       case 'sell':
-        return 'bg-loss/20 text-loss';
+        return 'danger';
       case 'transfer_in':
-        return 'bg-blue-500/20 text-blue-400';
+        return 'info';
       case 'transfer_out':
-        return 'bg-orange-500/20 text-orange-400';
+        return 'warning';
       default:
-        return 'bg-surface-700 text-surface-300';
+        return 'default';
     }
   };
 
@@ -165,58 +172,81 @@ export function TransactionsTable() {
   }
 
   return (
-    <div className="card p-6">
+    <Card className="p-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <h2 className="text-lg font-semibold text-surface-100">
           Transaction History
-          {(searchQuery || filter !== 'all') && ` (${filteredTx.length} of ${txList.length})`}
+          {(searchQuery || filter !== 'all') && (
+            <span className="text-surface-400 font-normal text-sm ml-2">
+              ({filteredTx.length} of {txList.length})
+            </span>
+          )}
         </h2>
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
+          <SearchInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
             placeholder="Search..."
-            className="input py-1.5 text-sm w-32"
+            size="sm"
+            className="w-32"
           />
           <div className="flex gap-1">
             {(['all', 'buy', 'sell', 'transfer'] as const).map(f => (
-              <button
+              <Button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-sm rounded ${
-                  filter === f
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
-                }`}
+                variant={filter === f ? 'primary' : 'secondary'}
+                size="xs"
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
+              </Button>
             ))}
           </div>
           {txList.length > 0 && (
-            <button
+            <Button
               onClick={handleExportCSV}
-              className="text-xs text-primary-400 hover:text-primary-300"
+              variant="ghost"
+              size="xs"
             >
               Export CSV
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8">
-          <div className="text-surface-400">Loading transactions...</div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-surface-700">
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Date</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Type</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Asset</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Amount</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Price</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Value</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Exchange</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonTableRow key={i} columns={7} />
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : filteredTx.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="text-4xl mb-4">&#128221;</div>
-          <p className="text-surface-400">No transactions found</p>
-          <p className="text-surface-500 text-sm mt-1">
-            Sync your exchanges to import transaction history.
-          </p>
-        </div>
+        searchQuery || filter !== 'all' ? (
+          <NoResultsEmptyState
+            searchTerm={searchQuery}
+            onClear={() => {
+              setSearchQuery('');
+              setFilter('all');
+            }}
+          />
+        ) : (
+          <NoDataEmptyState />
+        )
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -243,12 +273,15 @@ export function TransactionsTable() {
                       : new Date(tx.timestamp).toLocaleDateString()}
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(tx.type)}`}>
+                    <Badge variant={getTypeVariant(tx.type)} size="sm">
                       {formatType(tx.type)}
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="py-3 px-4 font-medium text-surface-100">
-                    {tx.asset}
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <AssetAvatar symbol={tx.asset} size="xs" />
+                      <span className="font-medium text-surface-100">{tx.asset}</span>
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-right font-tabular text-surface-300">
                     {formatAmount(tx.amount)}
@@ -259,8 +292,8 @@ export function TransactionsTable() {
                   <td className="py-3 px-4 text-right font-tabular text-surface-100">
                     {tx.priceUsd ? formatCurrency(tx.amount * tx.priceUsd) : '-'}
                   </td>
-                  <td className="py-3 px-4 text-surface-400 text-sm">
-                    {getExchangeName(tx.exchangeId)}
+                  <td className="py-3 px-4">
+                    <Badge size="sm">{getExchangeName(tx.exchangeId)}</Badge>
                   </td>
                 </tr>
               ))}
@@ -276,6 +309,6 @@ export function TransactionsTable() {
           </p>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

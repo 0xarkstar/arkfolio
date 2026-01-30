@@ -3,6 +3,11 @@ import Decimal from 'decimal.js';
 import { useExchangeStore } from '../../../stores/exchangeStore';
 import { Position } from '../../../services/exchanges';
 import { toast } from '../../../components/Toast';
+import { Card } from '../../../components/Card';
+import { SearchInput } from '../../../components/SearchInput';
+import { Button } from '../../../components/Button';
+import { Badge } from '../../../components/Badge';
+import { NoResultsEmptyState } from '../../../components/EmptyState';
 
 type SortField = 'symbol' | 'size' | 'pnl' | 'leverage';
 type SortDirection = 'asc' | 'desc';
@@ -145,45 +150,51 @@ export function PositionsTable() {
   );
 
   return (
-    <div className="card p-6">
+    <Card className="p-6">
       <div className="flex flex-col gap-4 mb-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-surface-100">
             Open Positions
-            {(searchQuery || filterSide !== 'all') &&
-              ` (${filteredAndSortedPositions.length} of ${allPositionsList.length})`}
+            {(searchQuery || filterSide !== 'all') && (
+              <span className="text-surface-400 font-normal text-sm ml-2">
+                ({filteredAndSortedPositions.length} of {allPositionsList.length})
+              </span>
+            )}
           </h2>
           <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="text"
+            <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder="Search..."
-              className="input py-1.5 text-sm w-32"
+              size="sm"
+              className="w-32"
             />
             <div className="flex gap-1">
               {(['all', 'long', 'short'] as const).map(side => (
-                <button
+                <Button
                   key={side}
                   onClick={() => setFilterSide(side)}
-                  className={`px-3 py-1 text-sm rounded ${
+                  variant={filterSide === side ? 'primary' : 'secondary'}
+                  size="xs"
+                  className={
                     filterSide === side
-                      ? side === 'long' ? 'bg-profit text-white' :
-                        side === 'short' ? 'bg-loss text-white' :
-                        'bg-primary-600 text-white'
-                      : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
-                  }`}
+                      ? side === 'long' ? '!bg-gain hover:!bg-gain/90' :
+                        side === 'short' ? '!bg-loss hover:!bg-loss/90' :
+                        ''
+                      : ''
+                  }
                 >
                   {side.charAt(0).toUpperCase() + side.slice(1)}
-                </button>
+                </Button>
               ))}
             </div>
-            <button
+            <Button
               onClick={handleExportCSV}
-              className="text-xs text-primary-400 hover:text-primary-300"
+              variant="ghost"
+              size="xs"
             >
               Export CSV
-            </button>
+            </Button>
           </div>
         </div>
         <div className="flex gap-4 text-sm">
@@ -195,7 +206,7 @@ export function PositionsTable() {
           </div>
           <div>
             <span className="text-surface-400">Total uPnL: </span>
-            <span className={`font-tabular ${totalPnl.greaterThanOrEqualTo(0) ? 'text-profit' : 'text-loss'}`}>
+            <span className={`font-tabular ${totalPnl.greaterThanOrEqualTo(0) ? 'text-gain' : 'text-loss'}`}>
               {totalPnl.greaterThanOrEqualTo(0) ? '+' : ''}${formatCurrency(totalPnl)}
             </span>
           </div>
@@ -203,18 +214,13 @@ export function PositionsTable() {
       </div>
 
       {filteredAndSortedPositions.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-surface-400 mb-2">No positions match your filters</p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setFilterSide('all');
-            }}
-            className="text-sm text-primary-400 hover:text-primary-300"
-          >
-            Clear all filters
-          </button>
-        </div>
+        <NoResultsEmptyState
+          searchTerm={searchQuery}
+          onClear={() => {
+            setSearchQuery('');
+            setFilterSide('all');
+          }}
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -263,7 +269,7 @@ export function PositionsTable() {
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -285,15 +291,9 @@ function PositionRow({ position, accountName }: PositionRowProps) {
         <span className="font-medium text-surface-100">{position.symbol}</span>
       </td>
       <td className="py-3 px-4">
-        <span
-          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            position.side === 'long'
-              ? 'bg-profit/20 text-profit'
-              : 'bg-loss/20 text-loss'
-          }`}
-        >
+        <Badge variant={position.side === 'long' ? 'success' : 'danger'} size="sm">
           {position.side.toUpperCase()}
-        </span>
+        </Badge>
       </td>
       <td className="py-3 px-4 text-right font-tabular text-surface-100">
         {formatAmount(position.size)}
@@ -320,9 +320,7 @@ function PositionRow({ position, accountName }: PositionRowProps) {
         {position.liquidationPrice ? formatPrice(position.liquidationPrice) : '-'}
       </td>
       <td className="py-3 px-4">
-        <span className="text-xs text-surface-400">
-          {accountName}
-        </span>
+        <Badge size="sm">{accountName}</Badge>
       </td>
     </tr>
   );

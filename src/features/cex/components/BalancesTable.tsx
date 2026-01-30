@@ -2,6 +2,13 @@ import { useState, useMemo } from 'react';
 import Decimal from 'decimal.js';
 import { useExchangeStore } from '../../../stores/exchangeStore';
 import { toast } from '../../../components/Toast';
+import { Card } from '../../../components/Card';
+import { SearchInput } from '../../../components/SearchInput';
+import { Checkbox } from '../../../components/Input';
+import { Button } from '../../../components/Button';
+import { AssetAvatar } from '../../../components/Avatar';
+import { Badge } from '../../../components/Badge';
+import { NoDataEmptyState, NoResultsEmptyState } from '../../../components/EmptyState';
 
 export function BalancesTable() {
   const { getAggregatedBalances, accounts } = useExchangeStore();
@@ -70,63 +77,55 @@ export function BalancesTable() {
 
   if (aggregatedBalances.length === 0) {
     return (
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Balances</h2>
-        <div className="text-center py-8 text-surface-400">
-          <p>No balances to display</p>
-          <p className="text-sm mt-1">Connect an exchange and sync to see your balances</p>
-        </div>
-      </div>
+        <NoDataEmptyState />
+      </Card>
     );
   }
 
   return (
-    <div className="card p-6">
+    <Card className="p-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <h2 className="text-lg font-semibold text-surface-100">
           Balances
-          {(searchQuery || hideSmallBalances) &&
-            ` (${filteredAndSortedBalances.length} of ${aggregatedBalances.length})`}
+          {(searchQuery || hideSmallBalances) && (
+            <span className="text-surface-400 font-normal text-sm ml-2">
+              ({filteredAndSortedBalances.length} of {aggregatedBalances.length})
+            </span>
+          )}
         </h2>
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
+          <SearchInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
             placeholder="Search asset..."
-            className="input py-1.5 text-sm w-32"
+            size="sm"
+            className="w-36"
           />
-          <label className="flex items-center gap-2 text-sm text-surface-400 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hideSmallBalances}
-              onChange={(e) => setHideSmallBalances(e.target.checked)}
-              className="rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500"
-            />
-            Hide small
-          </label>
-          <button
+          <Checkbox
+            checked={hideSmallBalances}
+            onChange={(e) => setHideSmallBalances(e.target.checked)}
+            label="Hide small"
+          />
+          <Button
             onClick={handleExportCSV}
-            className="text-xs text-primary-400 hover:text-primary-300"
+            variant="ghost"
+            size="xs"
           >
             Export CSV
-          </button>
+          </Button>
         </div>
       </div>
 
       {filteredAndSortedBalances.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-surface-400 mb-2">No balances match your filters</p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setHideSmallBalances(false);
-            }}
-            className="text-sm text-primary-400 hover:text-primary-300"
-          >
-            Clear all filters
-          </button>
-        </div>
+        <NoResultsEmptyState
+          searchTerm={searchQuery}
+          onClear={() => {
+            setSearchQuery('');
+            setHideSmallBalances(false);
+          }}
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -153,7 +152,7 @@ export function BalancesTable() {
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -182,7 +181,10 @@ function BalanceRow({ asset, total, byExchange, accounts }: BalanceRowProps) {
   return (
     <tr className="border-b border-surface-800 hover:bg-surface-800/50">
       <td className="py-3 px-4">
-        <span className="font-medium text-surface-100">{asset}</span>
+        <div className="flex items-center gap-2">
+          <AssetAvatar symbol={asset} size="sm" />
+          <span className="font-medium text-surface-100">{asset}</span>
+        </div>
       </td>
       <td className="py-3 px-4 text-right font-tabular text-surface-100">
         {formatAmount(total)}
@@ -198,11 +200,11 @@ function BalanceRow({ asset, total, byExchange, accounts }: BalanceRowProps) {
           {Array.from(byExchange.entries()).map(([accountId, balance]) => (
             <span
               key={accountId}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-700 rounded text-xs text-surface-300"
               title={`${getAccountName(accountId)}: ${formatAmount(balance.total)}`}
             >
-              {getAccountName(accountId).split(' ')[0]}
-              <span className="text-surface-400">{formatAmount(balance.total)}</span>
+              <Badge size="sm">
+                {getAccountName(accountId).split(' ')[0]} {formatAmount(balance.total)}
+              </Badge>
             </span>
           ))}
         </div>
