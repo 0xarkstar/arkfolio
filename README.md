@@ -14,17 +14,26 @@ ArkFolio is a privacy-first desktop application that aggregates all your cryptoc
 - **CEX Integration** - Connect Binance, Upbit, and OKX accounts via API
   - Spot balance tracking
   - Futures/perpetual position monitoring
+  - Transaction history sync
   - Real-time WebSocket updates (ready)
+- **On-chain Wallet Tracking** - Multi-chain support (Ethereum, Arbitrum, Optimism, Base, Polygon, BSC, Avalanche, Solana)
+- **DeFi Position Management** - Manual entry for LP, lending, staking, and vault positions
+- **Price Feed** - Real-time prices via CoinGecko API
+- **Watchlist** - Track favorite assets with live price updates
+- **Risk Dashboard** - Portfolio risk scoring, leverage monitoring, health factor tracking
+- **Global Search** - Quick navigation and asset lookup (Cmd/Ctrl+K)
+- **Auto-sync** - Configurable automatic data refresh
 - **Secure Storage** - OS-level encryption for API keys via Electron safeStorage
 - **Local Database** - SQLite WASM with OPFS for persistent, browser-sandboxed storage
 - **Modern UI** - Dark theme dashboard with responsive layout
 
+### In Progress
+- **Korean Tax Compliance** - Moving average cost basis calculation (UI ready)
+- **DeFi Protocol Integration** - Automatic position detection from protocols
+
 ### Planned
 - **DEX Integration** - Hyperliquid, dYdX perpetual position tracking
-- **On-chain Tracking** - Multi-chain wallet monitoring (EVM + Solana)
-- **DeFi Analytics** - LP positions, lending protocols, yield farming
-- **Korean Tax Compliance** - Moving average cost basis, HomeTax-compatible reports
-- **Risk Management** - Portfolio health monitoring, liquidation alerts
+- **HomeTax Export** - Korean tax report generation
 - **Google Drive Backup** - Encrypted cloud backup option
 
 ## Screenshots
@@ -112,52 +121,68 @@ arkfolio/
 | Electron safeStorage | Done | 100% |
 | CEX Adapters (Binance, Upbit, OKX) | Done | 100% |
 | UI Layout & Navigation | Done | 100% |
-| Portfolio Page | In Progress | 30% |
-| Settings Page | In Progress | 50% |
-| Wallets Page | Mockup | 5% |
-| DeFi Page | Mockup | 5% |
-| Tax Page | Mockup | 5% |
+| Price Feed (CoinGecko) | Done | 100% |
+| Transaction Sync | Done | 100% |
+| Watchlist | Done | 100% |
+| Global Search | Done | 100% |
+| Auto-sync | Done | 100% |
+| Risk Dashboard | Done | 100% |
+| Portfolio Page | Done | 90% |
+| Settings Page | Done | 80% |
+| Wallets Page | In Progress | 60% |
+| DeFi Page | In Progress | 50% |
+| Tax Page | In Progress | 30% |
 | DEX Integration | Not Started | 0% |
-| On-chain Indexing | Not Started | 0% |
-| Price Oracle | Not Started | 0% |
+| Google Drive Backup | Not Started | 0% |
 
 ## Roadmap
 
-### Phase 1: Foundation (Current)
+### Phase 1: Foundation (Complete)
 - [x] Electron + Vite + React setup
 - [x] SQLite WASM with OPFS
 - [x] Drizzle ORM schema
 - [x] CEX adapters (Binance, Upbit, OKX)
 - [x] Basic UI layout
 
-### Phase 2: CEX Completion
+### Phase 2: CEX & Portfolio (Complete)
+- [x] Trade history import
+- [x] Portfolio aggregation logic
+- [x] Price feed integration (CoinGecko)
+- [x] Watchlist with live prices
+- [x] Global search
+- [x] Auto-sync functionality
 - [ ] Real-time balance sync via WebSocket
-- [ ] Trade history import
-- [ ] Portfolio aggregation logic
-- [ ] Price feed integration
 
-### Phase 3: DEX & On-chain
-- [ ] Hyperliquid integration
-- [ ] dYdX v4 integration
-- [ ] EVM wallet tracking
-- [ ] Solana wallet tracking
+### Phase 3: On-chain & Wallets (Current)
+- [x] EVM wallet tracking (basic)
+- [x] Solana wallet tracking (basic)
+- [x] Multi-chain balance display
+- [ ] Automatic token detection
+- [ ] NFT tracking
 
-### Phase 4: DeFi & Analytics
-- [ ] LP position tracking
-- [ ] Lending protocol integration
+### Phase 4: DeFi & Analytics (In Progress)
+- [x] Manual LP position entry
+- [x] Manual lending position entry
+- [x] Points/airdrop tracking (manual)
+- [ ] Automatic protocol integration
 - [ ] Pendle PT/YT support
-- [ ] Points/airdrop tracking
 
-### Phase 5: Tax & Compliance
+### Phase 5: Risk Management (Complete)
+- [x] Net equity calculation
+- [x] Risk score computation
+- [x] Health factor monitoring
+- [x] Concentration analysis
+- [ ] Liquidation alerts
+
+### Phase 6: Tax & Compliance (Planned)
 - [ ] Korean tax calculation engine
 - [ ] Transaction categorization
 - [ ] HomeTax export format
 - [ ] Audit trail support
 
-### Phase 6: Risk & Backup
-- [ ] Net equity calculation
-- [ ] Liquidation alerts
+### Phase 7: Backup & Sync (Planned)
 - [ ] Google Drive backup
+- [ ] Encrypted export/import
 - [ ] Multi-device sync
 
 ## Database Schema

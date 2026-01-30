@@ -391,6 +391,25 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* Keyboard Shortcuts */}
+      <div className="card p-6">
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Keyboard Shortcuts</h2>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-surface-300">Global Search</span>
+            <kbd className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-300 font-mono">
+              {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + K
+            </kbd>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-surface-300">Close Modal / Cancel</span>
+            <kbd className="px-2 py-1 bg-surface-700 rounded text-xs text-surface-300 font-mono">
+              Esc
+            </kbd>
+          </div>
+        </div>
+      </div>
+
       {/* About */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">About</h2>
@@ -404,6 +423,25 @@ export function SettingsPage() {
             ArkFolio - Crypto Portfolio Tracker<br />
             Data is stored locally and encrypted using OS-level security.
           </p>
+        </div>
+        <div className="mt-4 flex gap-3">
+          <a
+            href="https://github.com/0xarkstar/arkfolio"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary-400 hover:text-primary-300"
+          >
+            GitHub
+          </a>
+          <span className="text-surface-600">|</span>
+          <a
+            href="https://github.com/0xarkstar/arkfolio/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary-400 hover:text-primary-300"
+          >
+            Report Issue
+          </a>
         </div>
       </div>
 

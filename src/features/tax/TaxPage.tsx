@@ -20,6 +20,7 @@ export function TaxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ trades: number; transfers: number } | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(50);
 
   const connectedAccounts = accounts.filter(a => a.isConnected);
 
@@ -157,30 +158,43 @@ export function TaxPage() {
 
       {/* Tax Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Total Gains</p>
-          <p className="text-xl font-bold text-profit font-tabular">
-            {formatKrw(displaySummary.totalGainsKrw)}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Total Losses</p>
-          <p className="text-xl font-bold text-loss font-tabular">
-            {formatKrw(displaySummary.totalLossesKrw)}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Net Gains</p>
-          <p className="text-xl font-bold text-surface-100 font-tabular">
-            {formatKrw(displaySummary.netGainsKrw)}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Estimated Tax (22%)</p>
-          <p className="text-xl font-bold text-warning font-tabular">
-            {formatKrw(displaySummary.estimatedTaxKrw)}
-          </p>
-        </div>
+        {isLoading && !summary ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="card p-4 animate-pulse">
+                <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
+                <div className="h-6 w-32 bg-surface-600 rounded" />
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Total Gains</p>
+              <p className="text-xl font-bold text-profit font-tabular">
+                {formatKrw(displaySummary.totalGainsKrw)}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Total Losses</p>
+              <p className="text-xl font-bold text-loss font-tabular">
+                {formatKrw(displaySummary.totalLossesKrw)}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Net Gains</p>
+              <p className="text-xl font-bold text-surface-100 font-tabular">
+                {formatKrw(displaySummary.netGainsKrw)}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Estimated Tax (22%)</p>
+              <p className="text-xl font-bold text-warning font-tabular">
+                {formatKrw(displaySummary.estimatedTaxKrw)}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tax Calculation Breakdown */}
@@ -243,7 +257,10 @@ export function TaxPage() {
             type="text"
             placeholder="Search transactions..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setDisplayLimit(50); // Reset pagination on search
+            }}
             className="input py-1 w-64"
           />
         </div>
@@ -286,7 +303,7 @@ export function TaxPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.slice(0, 50).map((tx) => (
+                {filteredTransactions.slice(0, displayLimit).map((tx) => (
                   <tr
                     key={tx.id}
                     className="border-b border-surface-800 hover:bg-surface-800/50"
@@ -338,10 +355,13 @@ export function TaxPage() {
           </div>
         )}
 
-        {filteredTransactions.length > 50 && (
+        {filteredTransactions.length > displayLimit && (
           <div className="flex justify-center mt-4">
-            <button className="text-sm text-primary-400 hover:text-primary-300">
-              Load More ({filteredTransactions.length - 50} remaining)
+            <button
+              onClick={() => setDisplayLimit((prev) => prev + 50)}
+              className="text-sm text-primary-400 hover:text-primary-300"
+            >
+              Load More ({filteredTransactions.length - displayLimit} remaining)
             </button>
           </div>
         )}

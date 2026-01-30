@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
 import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
+import { toast } from '../../components/Toast';
 
 const SUPPORTED_CHAINS = [
   { id: Chain.ETHEREUM, name: 'Ethereum', icon: 'E' },
@@ -84,6 +85,15 @@ export function WalletsPage() {
     return value.toFixed(8);
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Address copied to clipboard');
+    } catch {
+      toast.error('Failed to copy address');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -135,7 +145,7 @@ export function WalletsPage() {
               <div
                 key={wallet.id}
                 onClick={() => setSelectedWallet(wallet)}
-                className={`flex items-center justify-between p-4 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center justify-between p-4 rounded-lg cursor-pointer transition-colors ${
                   selectedWallet?.id === wallet.id
                     ? 'bg-primary-600/20 border border-primary-600'
                     : 'bg-surface-800 hover:bg-surface-750'
@@ -147,9 +157,34 @@ export function WalletsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-surface-100">{wallet.label}</p>
-                    <p className="text-sm text-surface-400 font-mono">
-                      {formatAddress(wallet.address)}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm text-surface-400 font-mono">
+                        {formatAddress(wallet.address)}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(wallet.address);
+                        }}
+                        className="p-0.5 text-surface-500 hover:text-surface-300 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Copy address"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                   <span className="px-2 py-0.5 bg-surface-700 rounded text-xs text-surface-300">
                     {CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain}
@@ -203,7 +238,29 @@ export function WalletsPage() {
 
           <div className="mb-4">
             <p className="text-sm text-surface-400">Address</p>
-            <p className="font-mono text-surface-200">{selectedWallet.address}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-surface-200">{selectedWallet.address}</p>
+              <button
+                onClick={() => copyToClipboard(selectedWallet.address)}
+                className="p-1 text-surface-400 hover:text-surface-200 transition-colors"
+                title="Copy address"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Native Balance */}

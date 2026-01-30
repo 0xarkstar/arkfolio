@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SupportedExchange, ExchangeCredentials } from '../../../services/exchanges';
 import { useExchangeStore } from '../../../stores/exchangeStore';
+import { toast } from '../../../components/Toast';
 
 interface AddExchangeModalProps {
   isOpen: boolean;
@@ -63,9 +64,12 @@ export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
         : credentials;
 
       await addExchange(selectedExchange.id, accountName, creds);
+      toast.success(`Connected to ${selectedExchange.name}`);
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add exchange');
+      const message = err instanceof Error ? err.message : 'Failed to add exchange';
+      setError(message);
+      toast.error(message);
     }
   };
 

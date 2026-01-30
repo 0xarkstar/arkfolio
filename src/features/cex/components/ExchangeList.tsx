@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useExchangeStore, ExchangeAccount } from '../../../stores/exchangeStore';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from '../../../components/Toast';
 
 interface ExchangeListProps {
   onAddExchange: () => void;
@@ -55,8 +56,20 @@ export function ExchangeList({ onAddExchange }: ExchangeListProps) {
             <ExchangeCard
               key={account.id}
               account={account}
-              onSync={() => syncExchange(account.id)}
-              onRemove={() => removeExchange(account.id)}
+              onSync={async () => {
+                try {
+                  await syncExchange(account.id);
+                  toast.success(`Synced ${account.name}`);
+                } catch {
+                  toast.error(`Failed to sync ${account.name}`);
+                }
+              }}
+              onRemove={async () => {
+                if (confirm(`Remove ${account.name}?`)) {
+                  await removeExchange(account.id);
+                  toast.info(`Removed ${account.name}`);
+                }
+              }}
             />
           ))}
         </div>

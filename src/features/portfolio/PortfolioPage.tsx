@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { PortfolioChart } from '../../components/charts';
@@ -6,6 +6,7 @@ import { PortfolioChart } from '../../components/charts';
 export function PortfolioPage() {
   const { summary, holdings, allocations, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
   const { accounts } = useExchangeStore();
+  const [showAllHoldings, setShowAllHoldings] = useState(false);
 
   // Refresh portfolio on mount and when accounts change
   useEffect(() => {
@@ -14,6 +15,7 @@ export function PortfolioPage() {
 
   const hasData = holdings.length > 0;
   const connectedExchanges = accounts.filter(a => a.isConnected).length;
+  const displayedHoldings = showAllHoldings ? holdings : holdings.slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -123,7 +125,7 @@ export function PortfolioPage() {
         <div className="card p-6">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">Top Holdings</h2>
           <div className="space-y-3">
-            {holdings.slice(0, 10).map((holding) => (
+            {displayedHoldings.map((holding) => (
               <div
                 key={holding.symbol}
                 className="flex items-center justify-between py-2 border-b border-surface-800 last:border-0"
@@ -154,8 +156,11 @@ export function PortfolioPage() {
 
           {holdings.length > 10 && (
             <div className="mt-4 text-center">
-              <button className="text-sm text-primary-400 hover:text-primary-300">
-                View all {holdings.length} assets
+              <button
+                onClick={() => setShowAllHoldings(!showAllHoldings)}
+                className="text-sm text-primary-400 hover:text-primary-300"
+              >
+                {showAllHoldings ? 'Show top 10' : `View all ${holdings.length} assets`}
               </button>
             </div>
           )}
