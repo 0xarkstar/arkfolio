@@ -1,26 +1,49 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useWalletsStore } from '../../stores/walletsStore';
 import { useDefiStore } from '../../stores/defiStore';
+import { toast } from '../../components/Toast';
 import Decimal from 'decimal.js';
 
 export function RiskPage() {
   const { allPositions } = useExchangeStore();
-  const { summary, holdings, refreshPortfolio } = usePortfolioStore();
-  const { getTotalValueUsd: getWalletsTotalValue, loadWallets } = useWalletsStore();
+  const { summary, holdings, refreshPortfolio, isLoading: portfolioLoading } = usePortfolioStore();
+  const { getTotalValueUsd: getWalletsTotalValue, loadWallets, isLoading: walletsLoading } = useWalletsStore();
   const {
     positions: defiPositions,
     getTotalValueUsd: getDefiTotalValue,
     getLowestHealthFactor,
     loadPositions: loadDefiPositions,
+    isLoading: defiLoading,
   } = useDefiStore();
 
-  useEffect(() => {
-    refreshPortfolio();
-    loadWallets();
-    loadDefiPositions();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const isLoading = portfolioLoading || walletsLoading || defiLoading;
+
+  const refreshData = useCallback(async (showToast = false) => {
+    if (showToast) setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refreshPortfolio(),
+        loadWallets(),
+        loadDefiPositions(),
+      ]);
+      setLastRefresh(new Date());
+      if (showToast) toast.success('Risk data refreshed');
+    } catch (error) {
+      console.error('Failed to refresh risk data:', error);
+      if (showToast) toast.error('Failed to refresh risk data');
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refreshPortfolio, loadWallets, loadDefiPositions]);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   // Calculate portfolio metrics
   const cexValue = summary.totalValueUsd;
@@ -114,6 +137,63 @@ export function RiskPage() {
 
   const riskLevel = getRiskLevel(riskScore);
 
+  const handleExportCSV = () => {
+    const rows: string[][] = [
+      ['Risk Report', new Date().toISOString()],
+      [],
+      ['Overall Metrics'],
+      ['Risk Score', riskScore.toString()],
+      ['Risk Level', riskLevel.label],
+      ['Total Portfolio Value', totalValue.toFixed(2)],
+      [],
+      ['Risk Factors'],
+      ['Leverage Ratio', totalFuturesExposure > 0 ? (totalFuturesExposure / totalValue.toNumber()).toFixed(2) : '0'],
+      ['Health Factor', lowestHealthResult ? lowestHealthResult.value.toFixed(2) : 'N/A'],
+      ['Top Asset Concentration', `${topHoldingPercent.toFixed(1)}%`],
+      ['IL Exposure', `${totalILExposure.div(totalValue.greaterThan(0) ? totalValue : new Decimal(1)).times(100).toFixed(1)}%`],
+      [],
+      ['Futures Exposure'],
+      ['Total Exposure', totalFuturesExposure.toFixed(2)],
+      ['Unrealized PnL', totalUnrealizedPnl.toFixed(2)],
+      ['Long Exposure', longExposure.toFixed(2)],
+      ['Short Exposure', shortExposure.toFixed(2)],
+    ];
+
+    if (futuresPositions.length > 0) {
+      rows.push([]);
+      rows.push(['Futures Positions']);
+      rows.push(['Symbol', 'Side', 'Size', 'Entry Price', 'Mark Price', 'uPnL', 'Liq. Price']);
+      futuresPositions.forEach(p => {
+        const size = p.size instanceof Decimal ? p.size.toNumber() : (p.size || 0);
+        const entry = p.entryPrice instanceof Decimal ? p.entryPrice.toNumber() : (p.entryPrice || 0);
+        const mark = p.markPrice instanceof Decimal ? p.markPrice.toNumber() : (p.markPrice || 0);
+        const pnl = p.unrealizedPnl instanceof Decimal ? p.unrealizedPnl.toNumber() : (p.unrealizedPnl || 0);
+        const liq = p.liquidationPrice instanceof Decimal ? p.liquidationPrice.toNumber() : p.liquidationPrice;
+        rows.push([
+          p.symbol,
+          p.side,
+          Math.abs(size).toFixed(4),
+          entry.toFixed(2),
+          mark.toFixed(2),
+          pnl.toFixed(2),
+          liq ? liq.toFixed(2) : '',
+        ]);
+      });
+    }
+
+    const csv = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `risk-report-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Risk report exported to CSV');
+  };
+
   const formatCurrency = (value: number | Decimal) => {
     const num = value instanceof Decimal ? value.toNumber() : value;
     return new Intl.NumberFormat('en-US', {
@@ -126,71 +206,126 @@ export function RiskPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header with actions */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-surface-100">Risk Analysis</h1>
+          {lastRefresh && (
+            <p className="text-xs text-surface-500">
+              Last updated: {lastRefresh.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => refreshData(true)}
+            disabled={isRefreshing}
+            className="text-sm text-primary-400 hover:text-primary-300 disabled:opacity-50"
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="text-sm text-primary-400 hover:text-primary-300"
+          >
+            Export CSV
+          </button>
+        </div>
+      </div>
+
       {/* Risk Score */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-6 md:col-span-1">
-          <p className="text-sm text-surface-400 mb-2">Overall Risk Score</p>
-          <div className="flex items-end gap-4">
-            <div className="relative">
-              <svg className="w-24 h-24 transform -rotate-90">
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  className="text-surface-800"
-                />
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${riskScore * 2.51} 251`}
-                  className={riskLevel.color}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-2xl font-bold ${riskLevel.color}`}>{riskScore}</span>
+        {isLoading && holdings.length === 0 ? (
+          <>
+            <div className="card p-6 md:col-span-1 animate-pulse">
+              <div className="h-4 w-32 bg-surface-700 rounded mb-4" />
+              <div className="flex items-end gap-4">
+                <div className="w-24 h-24 bg-surface-700 rounded-full" />
+                <div>
+                  <div className="h-6 w-20 bg-surface-700 rounded mb-2" />
+                  <div className="h-4 w-16 bg-surface-700 rounded" />
+                </div>
               </div>
             </div>
-            <div>
-              <p className={`text-xl font-bold ${riskLevel.color}`}>{riskLevel.label}</p>
-              <p className="text-sm text-surface-400">Risk Level</p>
+            <div className="card p-6 md:col-span-2 animate-pulse">
+              <div className="h-4 w-24 bg-surface-700 rounded mb-4" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="text-center">
+                    <div className="h-8 w-16 bg-surface-700 rounded mx-auto mb-2" />
+                    <div className="h-4 w-20 bg-surface-700 rounded mx-auto" />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="card p-6 md:col-span-1">
+              <p className="text-sm text-surface-400 mb-2">Overall Risk Score</p>
+              <div className="flex items-end gap-4">
+                <div className="relative">
+                  <svg className="w-24 h-24 transform -rotate-90">
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="none"
+                      className="text-surface-800"
+                    />
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="none"
+                      strokeDasharray={`${riskScore * 2.51} 251`}
+                      className={riskLevel.color}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-2xl font-bold ${riskLevel.color}`}>{riskScore}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className={`text-xl font-bold ${riskLevel.color}`}>{riskLevel.label}</p>
+                  <p className="text-sm text-surface-400">Risk Level</p>
+                </div>
+              </div>
+            </div>
 
-        <div className="card p-6 md:col-span-2">
-          <p className="text-sm text-surface-400 mb-4">Risk Factors</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <RiskFactor
-              label="Leverage"
-              value={totalFuturesExposure > 0
-                ? `${(totalFuturesExposure / totalValue.toNumber()).toFixed(2)}x`
-                : '0x'}
-              status={totalFuturesExposure === 0 ? 'good' : totalFuturesExposure / totalValue.toNumber() > 2 ? 'danger' : 'warning'}
-            />
-            <RiskFactor
-              label="Health Factor"
-              value={lowestHealthResult ? lowestHealthResult.value.toFixed(2) : 'N/A'}
-              status={!lowestHealthResult ? 'good' : lowestHealthResult.value > 2 ? 'good' : lowestHealthResult.value > 1.5 ? 'warning' : 'danger'}
-            />
-            <RiskFactor
-              label="Concentration"
-              value={`${topHoldingPercent.toFixed(1)}%`}
-              status={topHoldingPercent < 30 ? 'good' : topHoldingPercent < 50 ? 'warning' : 'danger'}
-            />
-            <RiskFactor
-              label="IL Exposure"
-              value={`${totalILExposure.div(totalValue.greaterThan(0) ? totalValue : new Decimal(1)).times(100).toFixed(1)}%`}
-              status={totalILExposure.isZero() ? 'good' : totalILExposure.div(totalValue).greaterThan(0.3) ? 'danger' : 'warning'}
-            />
-          </div>
-        </div>
+            <div className="card p-6 md:col-span-2">
+              <p className="text-sm text-surface-400 mb-4">Risk Factors</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <RiskFactor
+                  label="Leverage"
+                  value={totalFuturesExposure > 0
+                    ? `${(totalFuturesExposure / totalValue.toNumber()).toFixed(2)}x`
+                    : '0x'}
+                  status={totalFuturesExposure === 0 ? 'good' : totalFuturesExposure / totalValue.toNumber() > 2 ? 'danger' : 'warning'}
+                />
+                <RiskFactor
+                  label="Health Factor"
+                  value={lowestHealthResult ? lowestHealthResult.value.toFixed(2) : 'N/A'}
+                  status={!lowestHealthResult ? 'good' : lowestHealthResult.value > 2 ? 'good' : lowestHealthResult.value > 1.5 ? 'warning' : 'danger'}
+                />
+                <RiskFactor
+                  label="Concentration"
+                  value={`${topHoldingPercent.toFixed(1)}%`}
+                  status={topHoldingPercent < 30 ? 'good' : topHoldingPercent < 50 ? 'warning' : 'danger'}
+                />
+                <RiskFactor
+                  label="IL Exposure"
+                  value={`${totalILExposure.div(totalValue.greaterThan(0) ? totalValue : new Decimal(1)).times(100).toFixed(1)}%`}
+                  status={totalILExposure.isZero() ? 'good' : totalILExposure.div(totalValue).greaterThan(0.3) ? 'danger' : 'warning'}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Futures Positions */}
