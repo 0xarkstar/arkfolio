@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { SupportedExchange, ExchangeCredentials } from '../../../services/exchanges';
 import { useExchangeStore } from '../../../stores/exchangeStore';
 import { toast } from '../../../components/Toast';
+import { Modal, ModalFooter } from '../../../components/Modal';
+import { Button } from '../../../components/Button';
+import { Input } from '../../../components/Input';
+import { Alert } from '../../../components/Alert';
+import { Badge } from '../../../components/Badge';
 
 interface AddExchangeModalProps {
   isOpen: boolean;
@@ -41,8 +46,6 @@ export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
   const [accountName, setAccountName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ExchangeType>('cex');
-
-  if (!isOpen) return null;
 
   const handleSelectExchange = (exchange: ExchangeOption) => {
     setSelectedExchange(exchange);
@@ -92,216 +95,169 @@ export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="card w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-surface-100">
-            {step === 'select' ? 'Add Exchange' : `Connect ${selectedExchange?.name}`}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-surface-400 hover:text-surface-100 transition-colors text-2xl"
-          >
-            &times;
-          </button>
-        </div>
-
-        {step === 'select' ? (
-          <div>
-            {/* Tab selector */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setTab('cex')}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                  tab === 'cex'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-surface-800 text-surface-400 hover:text-surface-100'
-                }`}
-              >
-                CEX
-              </button>
-              <button
-                onClick={() => setTab('dex')}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                  tab === 'dex'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-surface-800 text-surface-400 hover:text-surface-100'
-                }`}
-              >
-                DEX / Perp
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {filteredExchanges.map(exchange => (
-                <button
-                  key={exchange.id}
-                  onClick={() => handleSelectExchange(exchange)}
-                  className="w-full flex items-center gap-4 p-4 bg-surface-800 hover:bg-surface-700 rounded-lg transition-colors text-left"
-                >
-                  <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-lg font-medium text-primary-400">
-                    {exchange.name[0]}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-surface-100">{exchange.name}</p>
-                    <p className="text-sm text-surface-400">{exchange.description}</p>
-                  </div>
-                  {exchange.type === 'dex' && (
-                    <span className="px-2 py-0.5 bg-primary-600/20 text-primary-400 text-xs rounded">
-                      Wallet
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={step === 'select' ? 'Add Exchange' : `Connect ${selectedExchange?.name}`}
+      size="md"
+    >
+      {step === 'select' ? (
+        <div>
+          {/* Tab selector */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              onClick={() => setTab('cex')}
+              variant={tab === 'cex' ? 'primary' : 'secondary'}
+              className="flex-1"
+            >
+              CEX
+            </Button>
+            <Button
+              onClick={() => setTab('dex')}
+              variant={tab === 'dex' ? 'primary' : 'secondary'}
+              className="flex-1"
+            >
+              DEX / Perp
+            </Button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 bg-loss/10 border border-loss/20 rounded-lg text-loss text-sm">
-                {error}
-              </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1">
-                Account Name
-              </label>
-              <input
+          <div className="space-y-3">
+            {filteredExchanges.map(exchange => (
+              <button
+                key={exchange.id}
+                onClick={() => handleSelectExchange(exchange)}
+                className="w-full flex items-center gap-4 p-4 bg-surface-800 hover:bg-surface-700 rounded-lg transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-surface-700 rounded-full flex items-center justify-center text-lg font-medium text-primary-400">
+                  {exchange.name[0]}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-surface-100">{exchange.name}</p>
+                  <p className="text-sm text-surface-400">{exchange.description}</p>
+                </div>
+                {exchange.type === 'dex' && (
+                  <Badge variant="info" size="sm">Wallet</Badge>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="error">
+              {error}
+            </Alert>
+          )}
+
+          <Input
+            label="Account Name"
+            type="text"
+            value={accountName}
+            onChange={e => setAccountName(e.target.value)}
+            placeholder="My Trading Account"
+            required
+          />
+
+          {selectedExchange?.type === 'dex' ? (
+            // DEX: Wallet address input
+            <>
+              <Input
+                label="Wallet Address"
                 type="text"
-                value={accountName}
-                onChange={e => setAccountName(e.target.value)}
-                className="input w-full"
-                placeholder="My Trading Account"
+                value={credentials.apiKey}
+                onChange={e => setCredentials({ ...credentials, apiKey: e.target.value })}
+                className="font-mono text-sm"
+                placeholder={getAddressPlaceholder()}
+                hint={selectedExchange.addressType === 'cosmos'
+                  ? 'Enter your dYdX address (dydx1...)'
+                  : 'Enter your EVM wallet address (0x...)'}
                 required
               />
-            </div>
 
-            {selectedExchange?.type === 'dex' ? (
-              // DEX: Wallet address input
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Wallet Address
-                  </label>
-                  <input
-                    type="text"
-                    value={credentials.apiKey}
-                    onChange={e => setCredentials({ ...credentials, apiKey: e.target.value })}
-                    className="input w-full font-mono text-sm"
-                    placeholder={getAddressPlaceholder()}
-                    required
-                  />
-                  <p className="text-xs text-surface-500 mt-1">
-                    {selectedExchange.addressType === 'cosmos'
-                      ? 'Enter your dYdX address (dydx1...)'
-                      : 'Enter your EVM wallet address (0x...)'}
-                  </p>
-                </div>
+              {selectedExchange.id === SupportedExchange.DYDX && (
+                <Input
+                  label="Subaccount Number (Optional)"
+                  type="number"
+                  value={credentials.apiSecret === 'readonly' ? '' : credentials.apiSecret}
+                  onChange={e => setCredentials({ ...credentials, apiSecret: e.target.value || 'readonly' })}
+                  placeholder="0"
+                  hint="Default is 0. Only change if you use multiple subaccounts."
+                />
+              )}
 
-                {selectedExchange.id === SupportedExchange.DYDX && (
-                  <div>
-                    <label className="block text-sm font-medium text-surface-300 mb-1">
-                      Subaccount Number (Optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={credentials.apiSecret === 'readonly' ? '' : credentials.apiSecret}
-                      onChange={e => setCredentials({ ...credentials, apiSecret: e.target.value || 'readonly' })}
-                      className="input w-full"
-                      placeholder="0"
-                      min="0"
-                    />
-                    <p className="text-xs text-surface-500 mt-1">
-                      Default is 0. Only change if you use multiple subaccounts.
-                    </p>
-                  </div>
-                )}
+              <div className="bg-surface-800 rounded-lg p-3 text-sm text-surface-400">
+                <p className="font-medium text-surface-300 mb-1">Read-Only Access</p>
+                <p>
+                  DEX tracking only requires your public wallet address.
+                  No private keys or signatures are needed.
+                </p>
+              </div>
+            </>
+          ) : (
+            // CEX: API key inputs
+            <>
+              <Input
+                label="API Key"
+                type="password"
+                value={credentials.apiKey}
+                onChange={e => setCredentials({ ...credentials, apiKey: e.target.value })}
+                className="font-mono"
+                placeholder="Enter your API key"
+                required
+              />
 
-                <div className="bg-surface-800 rounded-lg p-3 text-sm text-surface-400">
-                  <p className="font-medium text-surface-300 mb-1">Read-Only Access</p>
-                  <p>
-                    DEX tracking only requires your public wallet address.
-                    No private keys or signatures are needed.
-                  </p>
-                </div>
-              </>
-            ) : (
-              // CEX: API key inputs
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={credentials.apiKey}
-                    onChange={e => setCredentials({ ...credentials, apiKey: e.target.value })}
-                    className="input w-full font-mono"
-                    placeholder="Enter your API key"
-                    required
-                  />
-                </div>
+              <Input
+                label="API Secret"
+                type="password"
+                value={credentials.apiSecret}
+                onChange={e => setCredentials({ ...credentials, apiSecret: e.target.value })}
+                className="font-mono"
+                placeholder="Enter your API secret"
+                required
+              />
 
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    API Secret
-                  </label>
-                  <input
-                    type="password"
-                    value={credentials.apiSecret}
-                    onChange={e => setCredentials({ ...credentials, apiSecret: e.target.value })}
-                    className="input w-full font-mono"
-                    placeholder="Enter your API secret"
-                    required
-                  />
-                </div>
+              {selectedExchange?.requiresPassphrase && (
+                <Input
+                  label="Passphrase"
+                  type="password"
+                  value={credentials.passphrase}
+                  onChange={e => setCredentials({ ...credentials, passphrase: e.target.value })}
+                  className="font-mono"
+                  placeholder="Enter your passphrase"
+                  required
+                />
+              )}
 
-                {selectedExchange?.requiresPassphrase && (
-                  <div>
-                    <label className="block text-sm font-medium text-surface-300 mb-1">
-                      Passphrase
-                    </label>
-                    <input
-                      type="password"
-                      value={credentials.passphrase}
-                      onChange={e => setCredentials({ ...credentials, passphrase: e.target.value })}
-                      className="input w-full font-mono"
-                      placeholder="Enter your passphrase"
-                      required
-                    />
-                  </div>
-                )}
+              <div className="bg-surface-800 rounded-lg p-3 text-sm text-surface-400">
+                <p className="font-medium text-surface-300 mb-1">Security Note</p>
+                <p>
+                  API credentials are encrypted using your OS secure storage
+                  (Keychain/Credential Manager). Use read-only API keys.
+                </p>
+              </div>
+            </>
+          )}
 
-                <div className="bg-surface-800 rounded-lg p-3 text-sm text-surface-400">
-                  <p className="font-medium text-surface-300 mb-1">Security Note</p>
-                  <p>
-                    API credentials are encrypted using your OS secure storage
-                    (Keychain/Credential Manager). Use read-only API keys.
-                  </p>
-                </div>
-              </>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setStep('select')}
-                className="btn-secondary flex-1"
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="btn-primary flex-1"
-              >
-                {isLoading ? 'Connecting...' : 'Connect'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          <ModalFooter>
+            <Button
+              type="button"
+              onClick={() => setStep('select')}
+              variant="secondary"
+            >
+              Back
+            </Button>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              variant="primary"
+              loading={isLoading}
+            >
+              Connect
+            </Button>
+          </ModalFooter>
+        </form>
+      )}
+    </Modal>
   );
 }
