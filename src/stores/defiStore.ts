@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import Decimal from 'decimal.js';
 import { getDb, generateId } from '../database/init';
-import { defiPositions, points } from '../database/schema';
+import { defiPositions, points, wallets } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { zapperService } from '../services/defi';
 
 export interface DefiPosition {
   id: string;
@@ -35,7 +36,9 @@ interface DefiState {
   positions: DefiPosition[];
   pointsBalances: PointsBalance[];
   isLoading: boolean;
+  isSyncing: boolean;
   error: string | null;
+  lastZapperSync: Date | null;
 
   // Actions
   loadPositions: () => Promise<void>;
@@ -46,6 +49,10 @@ interface DefiState {
   addPoints: (points: Omit<PointsBalance, 'id'>) => Promise<string>;
   updatePoints: (id: string, balance: Decimal, estimatedValue?: Decimal) => Promise<void>;
   refreshAll: () => Promise<void>;
+
+  // Zapper auto-detection
+  syncFromZapper: () => Promise<void>;
+  isZapperConfigured: () => boolean;
 
   // Getters
   getTotalValueUsd: () => Decimal;
@@ -59,7 +66,9 @@ export const useDefiStore = create<DefiState>((set, get) => ({
   positions: [],
   pointsBalances: [],
   isLoading: false,
+  isSyncing: false,
   error: null,
+  lastZapperSync: null,
 
   loadPositions: async () => {
     set({ isLoading: true, error: null });
@@ -239,6 +248,100 @@ export const useDefiStore = create<DefiState>((set, get) => ({
 
   refreshAll: async () => {
     await Promise.all([get().loadPositions(), get().loadPoints()]);
+  },
+
+  isZapperConfigured: () => {
+    return zapperService.isConfigured();
+  },
+
+  syncFromZapper: async () => {
+    if (!zapperService.isConfigured()) {
+      throw new Error('Zapper API not configured. Please set your API key in Settings.');
+    }
+
+    set({ isSyncing: true, error: null });
+
+    try {
+      // Get all wallets from database
+      const db = getDb();
+      const storedWallets = await db.select().from(wallets);
+
+      if (storedWallets.length === 0) {
+        set({ isSyncing: false });
+        return;
+      }
+
+      // Fetch positions from Zapper for all wallets
+      const walletData = storedWallets.map((w) => ({
+        address: w.address,
+        id: w.id,
+      }));
+
+      const zapperPositions = await zapperService.getPositionsForWallets(walletData);
+
+      // Clear existing auto-detected positions (keep manual ones)
+      const { positions: currentPositions } = get();
+      const manualPositions = currentPositions.filter((p) => p.walletId === 'manual');
+
+      // Delete auto-detected positions from database
+      for (const position of currentPositions) {
+        if (position.walletId !== 'manual' && position.id.startsWith('zapper-')) {
+          try {
+            await db.delete(defiPositions).where(eq(defiPositions.id, position.id));
+          } catch {
+            // Position might not exist in DB
+          }
+        }
+      }
+
+      // Save new positions to database
+      for (const position of zapperPositions) {
+        await db.insert(defiPositions).values({
+          id: position.id,
+          walletId: position.walletId,
+          protocol: position.protocol,
+          positionType: position.positionType,
+          poolAddress: position.poolAddress,
+          assets: JSON.stringify(position.assets),
+          amounts: JSON.stringify(position.amounts.map((a) => a.toString())),
+          costBasisUsd: position.costBasisUsd.toNumber(),
+          currentValueUsd: position.currentValueUsd.toNumber(),
+          rewardsEarned: JSON.stringify(
+            Object.fromEntries(
+              Object.entries(position.rewardsEarned).map(([k, v]) => [k, v.toString()])
+            )
+          ),
+          apy: position.apy,
+          maturityDate: position.maturityDate,
+          healthFactor: position.healthFactor,
+          updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: defiPositions.id,
+          set: {
+            currentValueUsd: position.currentValueUsd.toNumber(),
+            apy: position.apy,
+            healthFactor: position.healthFactor,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      // Combine manual and auto-detected positions
+      const allPositions = [...manualPositions, ...zapperPositions];
+
+      set({
+        positions: allPositions,
+        isSyncing: false,
+        lastZapperSync: new Date(),
+      });
+    } catch (error) {
+      console.error('Failed to sync from Zapper:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to sync DeFi positions',
+        isSyncing: false,
+      });
+      throw error;
+    }
   },
 
   getTotalValueUsd: () => {

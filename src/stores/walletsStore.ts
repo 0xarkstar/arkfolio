@@ -27,12 +27,16 @@ interface WalletsState {
   isLoading: boolean;
   error: string | null;
 
+  // Filter state
+  showUnknownTokens: boolean;
+
   // Actions
   loadWallets: () => Promise<void>;
   addWallet: (address: string, chain: Chain, label: string) => Promise<string>;
   removeWallet: (walletId: string) => Promise<void>;
   syncWallet: (walletId: string) => Promise<void>;
   syncAllWallets: () => Promise<void>;
+  setShowUnknownTokens: (show: boolean) => void;
 
   // Getters
   getTotalValueUsd: () => Decimal;
@@ -43,6 +47,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
   wallets: [],
   isLoading: false,
   error: null,
+  showUnknownTokens: false, // Default: only show registered tokens
 
   loadWallets: async () => {
     set({ isLoading: true, error: null });
@@ -169,8 +174,14 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
     }
   },
 
+  setShowUnknownTokens: (show) => {
+    set({ showUnknownTokens: show });
+    // Re-sync all wallets with new filter setting
+    get().syncAllWallets();
+  },
+
   syncWallet: async (walletId) => {
-    const { wallets: currentWallets } = get();
+    const { wallets: currentWallets, showUnknownTokens } = get();
     const wallet = currentWallets.find((w) => w.id === walletId);
 
     if (!wallet) {
@@ -186,9 +197,11 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
 
     try {
       // Fetch wallet summary from blockchain service
+      // If showUnknownTokens is false, filter out unregistered tokens
       const summary = await walletService.getWalletSummary(wallet.address, {
         chains: [wallet.chain],
-        useCommonTokensOnly: true,
+        useCommonTokensOnly: false, // Fetch all tokens, then filter
+        filterUnknownTokens: !showUnknownTokens, // Filter if NOT showing unknown
       });
 
       const chainData = summary.chains.find((c) => c.chain === wallet.chain);

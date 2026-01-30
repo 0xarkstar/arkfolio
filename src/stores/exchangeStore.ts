@@ -13,6 +13,7 @@ import { transactionSyncService } from '../services/sync';
 import { getDb, generateId } from '../database/init';
 import { exchanges, balances, positions } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { useSettingsStore } from './settingsStore';
 
 export interface ExchangeAccount {
   id: string;
@@ -359,10 +360,19 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   },
 
   subscribeToUpdates: (accountId) => {
+    // Check if realtime sync is enabled
+    const { settings } = useSettingsStore.getState();
+    if (!settings.realtimeSync) {
+      console.log('Realtime sync disabled, skipping WebSocket subscription');
+      return () => { };
+    }
+
     const adapter = exchangeManager.getAdapter(accountId);
     if (!adapter) {
       return () => { };
     }
+
+    console.log(`Enabling realtime WebSocket updates for account ${accountId}`);
 
     const unsubscribeBalance = adapter.subscribeBalanceUpdates((balance) => {
       const { allBalances } = get();

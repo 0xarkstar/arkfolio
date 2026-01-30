@@ -12,6 +12,7 @@ export interface AppSettings {
   // Sync
   autoSync: boolean;
   syncInterval: number; // minutes
+  realtimeSync: boolean; // WebSocket real-time updates
 
   // Notifications
   notifications: boolean;
@@ -27,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   autoSync: true,
   syncInterval: 5,
+  realtimeSync: false, // Default OFF - uses polling instead
   notifications: true,
   taxMethod: 'moving_average',
   taxDeduction: 2500000,
