@@ -3,11 +3,13 @@ export * from './BaseAdapter';
 export { BinanceAdapter } from './binance';
 export { UpbitAdapter } from './upbit';
 export { OKXAdapter } from './okx';
+export { HyperliquidAdapter } from './hyperliquid';
 
 import { IExchangeAdapter, SupportedExchange, ExchangeCredentials } from './types';
 import { BinanceAdapter } from './binance';
 import { UpbitAdapter } from './upbit';
 import { OKXAdapter } from './okx';
+import { HyperliquidAdapter } from './hyperliquid';
 
 // Exchange adapter factory
 export function createExchangeAdapter(exchangeId: SupportedExchange): IExchangeAdapter {
@@ -18,6 +20,8 @@ export function createExchangeAdapter(exchangeId: SupportedExchange): IExchangeA
       return new UpbitAdapter();
     case SupportedExchange.OKX:
       return new OKXAdapter();
+    case SupportedExchange.HYPERLIQUID:
+      return new HyperliquidAdapter();
     default:
       throw new Error(`Unsupported exchange: ${exchangeId}`);
   }
