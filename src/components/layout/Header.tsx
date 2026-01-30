@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWalletsStore } from '../../stores/walletsStore';
+import { GlobalSearch } from '../GlobalSearch';
 
 const viewTitles: Record<ViewId, string> = {
   dashboard: 'Dashboard',
@@ -79,6 +80,8 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+        <GlobalSearch />
+
         {settings.autoSync && (
           <div className="flex items-center gap-1.5 text-xs text-surface-500">
             <span className="w-1.5 h-1.5 rounded-full bg-profit"></span>
