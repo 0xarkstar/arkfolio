@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
 import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+
+type SortField = 'label' | 'chain' | 'value' | 'assets';
+type SortDirection = 'asc' | 'desc';
 
 const SUPPORTED_CHAINS = [
   { id: Chain.ETHEREUM, name: 'Ethereum', icon: 'E' },
@@ -35,6 +38,12 @@ export function WalletsPage() {
   const [selectedWallet, setSelectedWallet] = useState<WalletWithBalances | null>(null);
   const [walletToRemove, setWalletToRemove] = useState<WalletWithBalances | null>(null);
 
+  // Search, filter, and sort state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterChain, setFilterChain] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('value');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
   useEffect(() => {
     loadWallets();
   }, [loadWallets]);
@@ -42,6 +51,107 @@ export function WalletsPage() {
   const totalValue = getTotalValueUsd();
   const uniqueChains = new Set(wallets.map((w) => w.chain)).size;
   const totalTokens = wallets.reduce((sum, w) => sum + w.tokenBalances.length, 0);
+
+  // Get unique chains in wallets for filter dropdown
+  const walletsChains = useMemo(() =>
+    Array.from(new Set(wallets.map(w => w.chain))).sort(),
+    [wallets]
+  );
+
+  // Filter and sort wallets
+  const filteredAndSortedWallets = useMemo(() => {
+    let filtered = wallets;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        w => w.label.toLowerCase().includes(query) ||
+             w.address.toLowerCase().includes(query) ||
+             CHAIN_CONFIGS[w.chain]?.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply chain filter
+    if (filterChain !== 'all') {
+      filtered = filtered.filter(w => w.chain === filterChain);
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'label':
+          comparison = a.label.localeCompare(b.label);
+          break;
+        case 'chain':
+          comparison = a.chain.localeCompare(b.chain);
+          break;
+        case 'value':
+          comparison = a.totalValueUsd.minus(b.totalValueUsd).toNumber();
+          break;
+        case 'assets': {
+          const assetsA = a.tokenBalances.length + (a.nativeBalance ? 1 : 0);
+          const assetsB = b.tokenBalances.length + (b.nativeBalance ? 1 : 0);
+          comparison = assetsA - assetsB;
+          break;
+        }
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    return sorted;
+  }, [wallets, searchQuery, filterChain, sortField, sortDirection]);
+
+  const handleExportCSV = () => {
+    if (wallets.length === 0) {
+      toast.error('No wallets to export');
+      return;
+    }
+
+    const headers = ['Label', 'Address', 'Chain', 'Asset', 'Balance', 'Value (USD)'];
+    const rows: string[][] = [];
+
+    filteredAndSortedWallets.forEach(wallet => {
+      const chainName = CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain;
+
+      // Add native balance
+      if (wallet.nativeBalance && wallet.nativeBalance.balance.greaterThan(0)) {
+        rows.push([
+          wallet.label,
+          wallet.address,
+          chainName,
+          wallet.nativeBalance.symbol,
+          wallet.nativeBalance.balance.toFixed(8),
+          wallet.nativeBalance.valueUsd?.toFixed(2) || '0',
+        ]);
+      }
+
+      // Add token balances
+      wallet.tokenBalances.forEach(token => {
+        rows.push([
+          wallet.label,
+          wallet.address,
+          chainName,
+          token.token.symbol,
+          token.balance.toFixed(8),
+          token.valueUsd?.toFixed(2) || '0',
+        ]);
+      });
+    });
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wallets-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Wallet balances exported to CSV');
+  };
 
   const handleAddWallet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,33 +219,105 @@ export function WalletsPage() {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Total On-chain Value</p>
-          <p className="text-2xl font-bold text-surface-100 font-tabular">
-            {formatCurrency(totalValue.toNumber())}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Wallets</p>
-          <p className="text-2xl font-bold text-surface-100">{wallets.length}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Chains</p>
-          <p className="text-2xl font-bold text-surface-100">{uniqueChains}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-surface-400">Total Tokens</p>
-          <p className="text-2xl font-bold text-surface-100">{totalTokens}</p>
-        </div>
+        {isLoading && wallets.length === 0 ? (
+          <>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-28 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-32 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-12 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-12 bg-surface-600 rounded" />
+            </div>
+            <div className="card p-4 animate-pulse">
+              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
+              <div className="h-8 w-12 bg-surface-600 rounded" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Total On-chain Value</p>
+              <p className="text-2xl font-bold text-surface-100 font-tabular">
+                {formatCurrency(totalValue.toNumber())}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Wallets</p>
+              <p className="text-2xl font-bold text-surface-100">{wallets.length}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Chains</p>
+              <p className="text-2xl font-bold text-surface-100">{uniqueChains}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-surface-400">Total Tokens</p>
+              <p className="text-2xl font-bold text-surface-100">{totalTokens}</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Wallets List */}
       <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-surface-100">Connected Wallets</h2>
-          <button onClick={() => setIsAddModalOpen(true)} className="btn-primary">
-            Add Wallet
-          </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold text-surface-100">
+            Connected Wallets
+            {(searchQuery || filterChain !== 'all') &&
+              ` (${filteredAndSortedWallets.length} of ${wallets.length})`}
+          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="input py-1.5 text-sm w-32"
+            />
+            <select
+              value={filterChain}
+              onChange={(e) => setFilterChain(e.target.value)}
+              className="input py-1.5 text-sm"
+            >
+              <option value="all">All Chains</option>
+              {walletsChains.map(chain => (
+                <option key={chain} value={chain}>
+                  {CHAIN_CONFIGS[chain]?.name || chain}
+                </option>
+              ))}
+            </select>
+            <select
+              value={`${sortField}-${sortDirection}`}
+              onChange={(e) => {
+                const [field, dir] = e.target.value.split('-');
+                setSortField(field as SortField);
+                setSortDirection(dir as SortDirection);
+              }}
+              className="input py-1.5 text-sm"
+            >
+              <option value="value-desc">Value: High to Low</option>
+              <option value="value-asc">Value: Low to High</option>
+              <option value="label-asc">Name: A to Z</option>
+              <option value="label-desc">Name: Z to A</option>
+              <option value="chain-asc">Chain: A to Z</option>
+              <option value="assets-desc">Assets: Most First</option>
+            </select>
+            {wallets.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                className="text-xs text-primary-400 hover:text-primary-300"
+              >
+                Export CSV
+              </button>
+            )}
+            <button onClick={() => setIsAddModalOpen(true)} className="btn-primary text-sm">
+              Add Wallet
+            </button>
+          </div>
         </div>
 
         {isLoading && wallets.length === 0 ? (
@@ -150,9 +332,22 @@ export function WalletsPage() {
               Add Your First Wallet
             </button>
           </div>
+        ) : filteredAndSortedWallets.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-surface-400 mb-2">No wallets match your filters</p>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setFilterChain('all');
+              }}
+              className="text-sm text-primary-400 hover:text-primary-300"
+            >
+              Clear all filters
+            </button>
+          </div>
         ) : (
           <div className="space-y-3">
-            {wallets.map((wallet) => (
+            {filteredAndSortedWallets.map((wallet) => (
               <div
                 key={wallet.id}
                 onClick={() => setSelectedWallet(wallet)}
