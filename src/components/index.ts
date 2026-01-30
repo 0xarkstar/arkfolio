@@ -33,6 +33,8 @@ export {
 export { Tabs, TabPanel, SimpleTabs } from './Tabs';
 export { Card, CardHeader, CardFooter, StatsCard } from './Card';
 export { Avatar, AssetAvatar, AvatarGroup, ChainAvatar } from './Avatar';
+export { Modal, ModalBody, ModalFooter } from './Modal';
+export { Dropdown, MenuDropdown, SelectDropdown } from './Dropdown';
 
 // Page components
 export { default as Dashboard } from './Dashboard';
