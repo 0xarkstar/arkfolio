@@ -35,6 +35,19 @@ export { Card, CardHeader, CardFooter, StatsCard } from './Card';
 export { Avatar, AssetAvatar, AvatarGroup, ChainAvatar } from './Avatar';
 export { Modal, ModalBody, ModalFooter } from './Modal';
 export { Dropdown, MenuDropdown, SelectDropdown } from './Dropdown';
+export {
+  Input,
+  Textarea,
+  Checkbox,
+  Radio,
+  RadioGroup,
+  Switch,
+  Select,
+  FormGroup,
+  FormRow,
+} from './Input';
+export { Button, IconButton, ButtonGroup } from './Button';
+export { DataTable, SimpleTable } from './DataTable';
 
 // Page components
 export { default as Dashboard } from './Dashboard';
