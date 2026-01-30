@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { Modal, ModalFooter } from './Modal';
+import { Button } from './Button';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -25,62 +27,43 @@ export function ConfirmDialog({
 
   useEffect(() => {
     if (isOpen) {
-      // Focus the cancel button by default for safety
+      // Focus the confirm button when dialog opens
       confirmButtonRef.current?.focus();
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel]);
-
-  if (!isOpen) return null;
-
-  const getConfirmButtonClass = () => {
+  const getConfirmVariant = (): 'primary' | 'danger' | 'success' => {
     switch (variant) {
       case 'danger':
-        return 'bg-loss hover:bg-loss/80 text-white';
+        return 'danger';
       case 'warning':
-        return 'bg-warning hover:bg-warning/80 text-black';
+        return 'danger';
       default:
-        return 'bg-primary-600 hover:bg-primary-500 text-white';
+        return 'primary';
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div
-        className="card w-full max-w-md p-6 mx-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-      >
-        <h3 id="confirm-dialog-title" className="text-lg font-semibold text-surface-100 mb-2">
-          {title}
-        </h3>
-        <p className="text-surface-400 mb-6">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="btn-secondary">
-            {cancelLabel}
-          </button>
-          <button
-            ref={confirmButtonRef}
-            onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg transition-colors ${getConfirmButtonClass()}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      title={title}
+      size="sm"
+    >
+      <p className="text-surface-400 mb-6">{message}</p>
+      <ModalFooter>
+        <Button onClick={onCancel} variant="secondary">
+          {cancelLabel}
+        </Button>
+        <Button
+          ref={confirmButtonRef}
+          onClick={onConfirm}
+          variant={getConfirmVariant()}
+        >
+          {confirmLabel}
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }
 
