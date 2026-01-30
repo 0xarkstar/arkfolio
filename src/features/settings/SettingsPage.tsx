@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
+import { toast } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
   settings as settingsTable,
   exchanges as exchangesTable,
@@ -59,12 +61,12 @@ export function SettingsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setExportStatus('Export complete!');
-      setTimeout(() => setExportStatus(null), 3000);
+      setExportStatus(null);
+      toast.success('Data exported successfully');
     } catch (error) {
       console.error('Export failed:', error);
-      setExportStatus('Export failed');
-      setTimeout(() => setExportStatus(null), 3000);
+      setExportStatus(null);
+      toast.error('Failed to export data');
     }
   };
 
@@ -109,14 +111,15 @@ export function SettingsPage() {
         }
       }
 
-      setImportStatus('Import complete! Reloading...');
+      setImportStatus(null);
+      toast.success('Data imported successfully. Reloading...');
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (error) {
       console.error('Import failed:', error);
-      setImportStatus('Import failed: Invalid file');
-      setTimeout(() => setImportStatus(null), 3000);
+      setImportStatus(null);
+      toast.error('Failed to import data: Invalid file format');
     }
 
     // Reset file input
@@ -156,11 +159,12 @@ export function SettingsPage() {
       }
 
       setShowClearConfirm(false);
+      toast.success('All data cleared. Reloading...');
       // Reload the page to reset all state
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Failed to clear data:', error);
-      alert('Failed to clear data. Please try again.');
+      toast.error('Failed to clear data. Please try again.');
     } finally {
       setIsClearing(false);
     }
@@ -445,34 +449,16 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Clear Data Confirmation Modal */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-surface-100 mb-2">Clear All Data?</h3>
-            <p className="text-surface-400 mb-4">
-              This action cannot be undone. All your exchange connections, transaction history,
-              and settings will be permanently deleted.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowClearConfirm(false)}
-                className="btn-secondary"
-                disabled={isClearing}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearData}
-                className="px-4 py-2 bg-loss hover:bg-loss/80 text-white rounded-lg transition-colors disabled:opacity-50"
-                disabled={isClearing}
-              >
-                {isClearing ? 'Clearing...' : 'Clear All Data'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Clear Data Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        title="Clear All Data?"
+        message="This action cannot be undone. All your exchange connections, transaction history, and settings will be permanently deleted."
+        confirmLabel={isClearing ? 'Clearing...' : 'Clear All Data'}
+        variant="danger"
+        onConfirm={handleClearData}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }
