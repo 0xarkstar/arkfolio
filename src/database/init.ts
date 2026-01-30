@@ -1,12 +1,9 @@
 import { drizzle } from 'drizzle-orm/sql-js';
+import type { Database } from 'sql.js';
 import * as schema from './schema';
 
-// Type for sql.js Database
-type SqlJsDatabase = Awaited<ReturnType<typeof import('sql.js')>>['prototype']['Database']['prototype'] & {
-  run: (sql: string) => void;
-  export: () => Uint8Array;
-  close: () => void;
-};
+// Type alias for sql.js Database
+type SqlJsDatabase = Database;
 
 // Database file name for OPFS persistence
 const DB_NAME = 'arkfolio.db';

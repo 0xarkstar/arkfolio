@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createChart, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
 
 interface PortfolioChartProps {
-  data: { time: string; value: number }[];
+  data?: { time: string; value: number }[];
   height?: number;
   showTooltip?: boolean;
 }

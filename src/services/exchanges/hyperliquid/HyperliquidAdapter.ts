@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from 'axios';
-import Decimal from 'decimal.js';
 import { BaseExchangeAdapter } from '../BaseAdapter';
 import {
   ExchangeCredentials,
@@ -65,13 +64,6 @@ interface HyperliquidUserFill {
   crossed: boolean;
   fee: string;
   tid: number;
-}
-
-interface HyperliquidFundingHistory {
-  coin: string;
-  fundingRate: string;
-  premium: string;
-  time: number;
 }
 
 interface HyperliquidMeta {

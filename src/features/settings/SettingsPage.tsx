@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
+import {
+  settings as settingsTable,
+  exchanges as exchangesTable,
+  balances as balancesTable,
+  positions as positionsTable,
+  wallets as walletsTable,
+  transactions as transactionsTable,
+} from '../../database/schema';
 
 export function SettingsPage() {
   const { settings, isLoading, isSaving, loadSettings, updateSetting } = useSettingsStore();
@@ -27,12 +35,12 @@ export function SettingsPage() {
       const data = {
         exportedAt: new Date().toISOString(),
         version: '0.1.0',
-        settings: await db.query.settings.findMany(),
-        exchanges: await db.query.exchanges.findMany(),
-        balances: await db.query.balances.findMany(),
-        positions: await db.query.positions.findMany(),
-        wallets: await db.query.wallets.findMany(),
-        transactions: await db.query.transactions.findMany(),
+        settings: await db.select().from(settingsTable),
+        exchanges: await db.select().from(exchangesTable),
+        balances: await db.select().from(balancesTable),
+        positions: await db.select().from(positionsTable),
+        wallets: await db.select().from(walletsTable),
+        transactions: await db.select().from(transactionsTable),
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
