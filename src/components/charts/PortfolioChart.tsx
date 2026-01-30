@@ -79,6 +79,7 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('1M');
   const [currentValue, setCurrentValue] = useState<number | null>(null);
   const [changePercent, setChangePercent] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -174,27 +175,36 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    const data = generateMockData(selectedPeriod);
-    const chartData: LineData[] = data.map(d => ({
-      time: d.time as Time,
-      value: d.value,
-    }));
+    setIsLoading(true);
 
-    seriesRef.current.setData(chartData);
+    // Simulate data loading delay for UX
+    const timer = setTimeout(() => {
+      const data = generateMockData(selectedPeriod);
+      const chartData: LineData[] = data.map(d => ({
+        time: d.time as Time,
+        value: d.value,
+      }));
 
-    // Calculate change
-    if (data.length >= 2) {
-      const startValue = data[0].value;
-      const endValue = data[data.length - 1].value;
-      const change = ((endValue - startValue) / startValue) * 100;
-      setChangePercent(change);
-      setCurrentValue(endValue);
-    }
+      seriesRef.current?.setData(chartData);
 
-    // Fit content
-    if (chartRef.current) {
-      chartRef.current.timeScale().fitContent();
-    }
+      // Calculate change
+      if (data.length >= 2) {
+        const startValue = data[0].value;
+        const endValue = data[data.length - 1].value;
+        const change = ((endValue - startValue) / startValue) * 100;
+        setChangePercent(change);
+        setCurrentValue(endValue);
+      }
+
+      // Fit content
+      if (chartRef.current) {
+        chartRef.current.timeScale().fitContent();
+      }
+
+      setIsLoading(false);
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [selectedPeriod]);
 
   const periods: Period[] = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
@@ -204,7 +214,12 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          {currentValue !== null && (
+          {isLoading ? (
+            <div className="flex items-baseline gap-3 animate-pulse">
+              <div className="h-8 w-32 bg-surface-700 rounded" />
+              <div className="h-5 w-16 bg-surface-700 rounded" />
+            </div>
+          ) : currentValue !== null ? (
             <div className="flex items-baseline gap-3">
               <span className="text-2xl font-bold text-surface-100 font-tabular">
                 ${currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -213,14 +228,15 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
                 {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
               </span>
             </div>
-          )}
+          ) : null}
         </div>
         <div className="flex gap-1">
           {periods.map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
-              className={`px-3 py-1 text-sm rounded transition-colors ${
+              disabled={isLoading}
+              className={`px-3 py-1 text-sm rounded transition-colors disabled:opacity-50 ${
                 selectedPeriod === period
                   ? 'bg-primary-600 text-white'
                   : 'bg-surface-800 text-surface-400 hover:text-surface-100'
@@ -231,7 +247,14 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
           ))}
         </div>
       </div>
-      <div ref={chartContainerRef} className="w-full" />
+      <div className="relative">
+        <div ref={chartContainerRef} className={`w-full transition-opacity ${isLoading ? 'opacity-50' : 'opacity-100'}`} />
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
