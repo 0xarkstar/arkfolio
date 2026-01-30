@@ -186,6 +186,7 @@ export enum SupportedExchange {
   BITHUMB = 'bithumb',
   OKX = 'okx',
   HYPERLIQUID = 'hyperliquid',
+  DYDX = 'dydx',
 }
 
 // Exchange status
