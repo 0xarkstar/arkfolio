@@ -1,19 +1,83 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
+import { getDb } from '../../database/init';
 
 export function SettingsPage() {
-  const [settings, setSettings] = useState({
-    currency: 'USD',
-    language: 'en',
-    theme: 'dark',
-    autoSync: true,
-    syncInterval: 5,
-    notifications: true,
-    taxMethod: 'moving_average',
-    taxDeduction: 2500000,
-  });
+  const { settings, isLoading, isSaving, loadSettings, updateSetting } = useSettingsStore();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleSettingChange = async <K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K]
+  ) => {
+    await updateSetting(key, value);
+  };
+
+  const handleExportData = async () => {
+    try {
+      setExportStatus('Exporting...');
+      const db = getDb();
+
+      // Export all tables
+      const data = {
+        exportedAt: new Date().toISOString(),
+        version: '0.1.0',
+        settings: await db.query.settings.findMany(),
+        exchanges: await db.query.exchanges.findMany(),
+        balances: await db.query.balances.findMany(),
+        positions: await db.query.positions.findMany(),
+        wallets: await db.query.wallets.findMany(),
+        transactions: await db.query.transactions.findMany(),
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `arkfolio-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportStatus('Export complete!');
+      setTimeout(() => setExportStatus(null), 3000);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportStatus('Export failed');
+      setTimeout(() => setExportStatus(null), 3000);
+    }
+  };
+
+  const handleClearData = async () => {
+    // This would need to clear all data from the database
+    // For safety, just close the modal for now
+    setShowClearConfirm(false);
+    alert('This feature is not yet implemented for safety reasons.');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-surface-400">Loading settings...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Saving indicator */}
+      {isSaving && (
+        <div className="fixed top-4 right-4 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm">
+          Saving...
+        </div>
+      )}
+
       {/* General Settings */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">General</h2>
@@ -25,7 +89,7 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.currency}
-              onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+              onChange={(e) => handleSettingChange('currency', e.target.value as AppSettings['currency'])}
               className="input w-32"
             >
               <option value="USD">USD</option>
@@ -42,11 +106,11 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.language}
-              onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+              onChange={(e) => handleSettingChange('language', e.target.value as AppSettings['language'])}
               className="input w-32"
             >
               <option value="en">English</option>
-              <option value="ko">한국어</option>
+              <option value="ko">Korean</option>
             </select>
           </div>
 
@@ -57,7 +121,7 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.theme}
-              onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
+              onChange={(e) => handleSettingChange('theme', e.target.value as AppSettings['theme'])}
               className="input w-32"
             >
               <option value="dark">Dark</option>
@@ -81,7 +145,7 @@ export function SettingsPage() {
               <input
                 type="checkbox"
                 checked={settings.autoSync}
-                onChange={(e) => setSettings({ ...settings, autoSync: e.target.checked })}
+                onChange={(e) => handleSettingChange('autoSync', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
@@ -95,7 +159,7 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.syncInterval}
-              onChange={(e) => setSettings({ ...settings, syncInterval: Number(e.target.value) })}
+              onChange={(e) => handleSettingChange('syncInterval', Number(e.target.value))}
               className="input w-32"
               disabled={!settings.autoSync}
             >
@@ -116,7 +180,7 @@ export function SettingsPage() {
               <input
                 type="checkbox"
                 checked={settings.notifications}
-                onChange={(e) => setSettings({ ...settings, notifications: e.target.checked })}
+                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
@@ -136,7 +200,7 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.taxMethod}
-              onChange={(e) => setSettings({ ...settings, taxMethod: e.target.value })}
+              onChange={(e) => handleSettingChange('taxMethod', e.target.value as AppSettings['taxMethod'])}
               className="input w-40"
             >
               <option value="moving_average">Moving Average</option>
@@ -152,11 +216,11 @@ export function SettingsPage() {
             </div>
             <select
               value={settings.taxDeduction}
-              onChange={(e) => setSettings({ ...settings, taxDeduction: Number(e.target.value) })}
+              onChange={(e) => handleSettingChange('taxDeduction', Number(e.target.value))}
               className="input w-40"
             >
-              <option value={2500000}>₩2,500,000 (Current)</option>
-              <option value={50000000}>₩50,000,000 (2025~)</option>
+              <option value={2500000}>2,500,000 (Current)</option>
+              <option value={50000000}>50,000,000 (2025~)</option>
             </select>
           </div>
         </div>
@@ -171,8 +235,8 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Google Drive Backup</p>
               <p className="text-sm text-surface-400">Sync encrypted backup to Google Drive</p>
             </div>
-            <button className="btn-secondary text-sm">
-              Connect
+            <button className="btn-secondary text-sm" disabled>
+              Coming Soon
             </button>
           </div>
 
@@ -181,8 +245,12 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Export Data</p>
               <p className="text-sm text-surface-400">Download all your data as JSON</p>
             </div>
-            <button className="btn-secondary text-sm">
-              Export
+            <button
+              onClick={handleExportData}
+              className="btn-secondary text-sm"
+              disabled={!!exportStatus}
+            >
+              {exportStatus || 'Export'}
             </button>
           </div>
 
@@ -191,7 +259,10 @@ export function SettingsPage() {
               <p className="font-medium text-surface-100">Clear All Data</p>
               <p className="text-sm text-surface-400">Delete all local data permanently</p>
             </div>
-            <button className="px-4 py-2 bg-loss/20 hover:bg-loss/30 text-loss rounded-lg text-sm transition-colors">
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="px-4 py-2 bg-loss/20 hover:bg-loss/30 text-loss rounded-lg text-sm transition-colors"
+            >
               Clear Data
             </button>
           </div>
@@ -213,6 +284,33 @@ export function SettingsPage() {
           </p>
         </div>
       </div>
+
+      {/* Clear Data Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-surface-100 mb-2">Clear All Data?</h3>
+            <p className="text-surface-400 mb-4">
+              This action cannot be undone. All your exchange connections, transaction history,
+              and settings will be permanently deleted.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearData}
+                className="px-4 py-2 bg-loss hover:bg-loss/80 text-white rounded-lg transition-colors"
+              >
+                Clear All Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
