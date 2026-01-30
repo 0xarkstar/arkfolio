@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useWalletsStore } from '../../stores/walletsStore';
 import { GlobalSearch } from '../GlobalSearch';
 import { toast } from '../Toast';
+import { Button } from '../Button';
 
 const viewTitles: Record<ViewId, string> = {
   dashboard: 'Dashboard',
@@ -103,10 +104,12 @@ export default function Header() {
           <span className="text-surface-300">{formatLastSync(lastSync)}</span>
         </div>
 
-        <button
+        <Button
           onClick={handleSyncAll}
-          disabled={connectedCount === 0 && wallets.length === 0 || isSyncing}
-          className="btn-secondary text-sm py-1.5 flex items-center gap-2 disabled:opacity-50"
+          disabled={connectedCount === 0 && wallets.length === 0}
+          variant="secondary"
+          size="sm"
+          loading={isSyncing}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -125,8 +128,8 @@ export default function Header() {
             <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
             <path d="M16 16h5v5" />
           </svg>
-          {isSyncing ? 'Syncing...' : 'Sync All'}
-        </button>
+          Sync All
+        </Button>
       </div>
     </header>
   );
