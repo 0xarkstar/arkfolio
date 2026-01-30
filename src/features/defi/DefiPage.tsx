@@ -131,9 +131,11 @@ export function DefiPage() {
     getLowestHealthFactor,
     addPosition,
     removePosition,
+    addPoints,
   } = useDefiStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -147,6 +149,18 @@ export function DefiPage() {
   const [formCostBasis, setFormCostBasis] = useState('');
   const [formApy, setFormApy] = useState('');
   const [formHealthFactor, setFormHealthFactor] = useState('');
+
+  // Points form state
+  const [pointsProtocol, setPointsProtocol] = useState('');
+  const [pointsBalance, setPointsBalance] = useState('');
+  const [pointsEstValue, setPointsEstValue] = useState('');
+
+  const resetPointsForm = () => {
+    setPointsProtocol('');
+    setPointsBalance('');
+    setPointsEstValue('');
+    setAddError(null);
+  };
 
   const resetForm = () => {
     setFormProtocol('Aave V3');
@@ -210,6 +224,40 @@ export function DefiPage() {
   const handleRemovePosition = async (id: string) => {
     if (confirm('Remove this position?')) {
       await removePosition(id);
+    }
+  };
+
+  const handleAddPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAdding(true);
+    setAddError(null);
+
+    try {
+      if (!pointsProtocol.trim()) {
+        throw new Error('Please enter a protocol name');
+      }
+
+      const balance = parseFloat(pointsBalance) || 0;
+      if (balance <= 0) {
+        throw new Error('Please enter a valid points balance');
+      }
+
+      const estValue = pointsEstValue ? parseFloat(pointsEstValue) : null;
+
+      await addPoints({
+        protocol: pointsProtocol.trim(),
+        walletAddress: '',
+        pointsBalance: new Decimal(balance),
+        estimatedValueUsd: estValue ? new Decimal(estValue) : null,
+        lastSync: new Date(),
+      });
+
+      setShowPointsModal(false);
+      resetPointsForm();
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'Failed to add points');
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -440,25 +488,43 @@ export function DefiPage() {
 
       {/* Points Tracking */}
       <div className="card p-6">
-        <h2 className="text-lg font-semibold text-surface-100 mb-4">Points & Airdrops</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {pointsBalances.map((point) => (
-            <div key={point.id} className="bg-surface-800 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-surface-100">{point.protocol}</span>
-                <span className="text-xs text-surface-400">Points</span>
-              </div>
-              <p className="text-2xl font-bold text-primary-400 font-tabular">
-                {point.pointsBalance.toNumber().toLocaleString()}
-              </p>
-              {point.estimatedValueUsd && (
-                <p className="text-sm text-surface-400 mt-1">
-                  Est. {formatCurrency(point.estimatedValueUsd)}
-                </p>
-              )}
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-surface-100">Points & Airdrops</h2>
+          <button
+            onClick={() => setShowPointsModal(true)}
+            className="btn-secondary text-sm"
+          >
+            Add Points
+          </button>
         </div>
+        {pointsBalances.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4">&#11088;</div>
+            <p className="text-surface-400 mb-2">No points tracked</p>
+            <p className="text-surface-500 text-sm">
+              Track your protocol points and potential airdrops.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {pointsBalances.map((point) => (
+              <div key={point.id} className="bg-surface-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-surface-100">{point.protocol}</span>
+                  <span className="text-xs text-surface-400">Points</span>
+                </div>
+                <p className="text-2xl font-bold text-primary-400 font-tabular">
+                  {point.pointsBalance.toNumber().toLocaleString()}
+                </p>
+                {point.estimatedValueUsd && (
+                  <p className="text-sm text-surface-400 mt-1">
+                    Est. {formatCurrency(point.estimatedValueUsd)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Risk Overview */}
@@ -731,6 +797,95 @@ export function DefiPage() {
                   disabled={isAdding}
                 >
                   {isAdding ? 'Adding...' : 'Add Position'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Points Modal */}
+      {showPointsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="card w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-surface-100">Add Points</h2>
+              <button
+                onClick={() => { setShowPointsModal(false); resetPointsForm(); }}
+                className="text-surface-400 hover:text-surface-100 text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            {addError && (
+              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
+                {addError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddPoints} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1">
+                  Protocol Name
+                </label>
+                <input
+                  type="text"
+                  value={pointsProtocol}
+                  onChange={(e) => setPointsProtocol(e.target.value)}
+                  placeholder="e.g., EigenLayer, Renzo, Ethena"
+                  className="input w-full"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1">
+                  Points Balance
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={pointsBalance}
+                  onChange={(e) => setPointsBalance(e.target.value)}
+                  placeholder="0"
+                  className="input w-full"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1">
+                  Estimated Value (USD) - Optional
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={pointsEstValue}
+                  onChange={(e) => setPointsEstValue(e.target.value)}
+                  placeholder="0.00"
+                  className="input w-full"
+                />
+                <p className="text-xs text-surface-500 mt-1">
+                  Your estimate of the potential airdrop value
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowPointsModal(false); resetPointsForm(); }}
+                  className="btn-secondary flex-1"
+                  disabled={isAdding}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={isAdding}
+                >
+                  {isAdding ? 'Adding...' : 'Add Points'}
                 </button>
               </div>
             </form>
