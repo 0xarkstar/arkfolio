@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDefiStore, DefiPosition } from '../../stores/defiStore';
 import { toast } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import Decimal from 'decimal.js';
 
 // Mock data for demonstration when no real data exists
@@ -139,6 +140,7 @@ export function DefiPage() {
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [positionToRemove, setPositionToRemove] = useState<DefiPosition | null>(null);
 
   // Form state
   const [formProtocol, setFormProtocol] = useState('Aave V3');
@@ -225,10 +227,15 @@ export function DefiPage() {
     }
   };
 
-  const handleRemovePosition = async (id: string) => {
-    if (confirm('Remove this position?')) {
-      await removePosition(id);
+  const handleRemovePosition = (position: DefiPosition) => {
+    setPositionToRemove(position);
+  };
+
+  const confirmRemovePosition = async () => {
+    if (positionToRemove) {
+      await removePosition(positionToRemove.id);
       toast.info('Position removed');
+      setPositionToRemove(null);
     }
   };
 
@@ -478,7 +485,7 @@ export function DefiPage() {
                     <td className="py-3 px-4">
                       {position.walletId === 'manual' && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleRemovePosition(position.id); }}
+                          onClick={(e) => { e.stopPropagation(); handleRemovePosition(position); }}
                           className="text-surface-500 hover:text-loss transition-colors"
                           title="Remove position"
                         >
@@ -900,6 +907,17 @@ export function DefiPage() {
           </div>
         </div>
       )}
+
+      {/* Remove Position Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={!!positionToRemove}
+        title="Remove Position"
+        message={`Are you sure you want to remove this ${positionToRemove?.protocol} position?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={confirmRemovePosition}
+        onCancel={() => setPositionToRemove(null)}
+      />
     </div>
   );
 }
