@@ -1,49 +1,191 @@
+import { useState, useMemo } from 'react';
 import Decimal from 'decimal.js';
 import { useExchangeStore } from '../../../stores/exchangeStore';
 import { Position } from '../../../services/exchanges';
+import { toast } from '../../../components/Toast';
+
+type SortField = 'symbol' | 'size' | 'pnl' | 'leverage';
+type SortDirection = 'asc' | 'desc';
 
 export function PositionsTable() {
   const { allPositions, accounts } = useExchangeStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSide, setFilterSide] = useState<'all' | 'long' | 'short'>('all');
+  const [sortField, setSortField] = useState<SortField>('pnl');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Flatten all positions
-  const allPositionsList: Array<{ accountId: string; position: Position }> = [];
-  allPositions.forEach((positions, accountId) => {
-    positions.forEach(position => {
-      allPositionsList.push({ accountId, position });
+  const allPositionsList = useMemo(() => {
+    const list: Array<{ accountId: string; position: Position }> = [];
+    allPositions.forEach((positions, accountId) => {
+      positions.forEach(position => {
+        list.push({ accountId, position });
+      });
     });
-  });
-
-  if (allPositionsList.length === 0) {
-    return (
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-surface-100 mb-4">Open Positions</h2>
-        <div className="text-center py-8 text-surface-400">
-          <p>No open positions</p>
-          <p className="text-sm mt-1">Your futures positions will appear here</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate totals
-  const totalPnl = allPositionsList.reduce(
-    (sum, { position }) => sum.plus(position.unrealizedPnl),
-    new Decimal(0)
-  );
-
-  const totalNotional = allPositionsList.reduce(
-    (sum, { position }) => sum.plus(position.notional),
-    new Decimal(0)
-  );
+    return list;
+  }, [allPositions]);
 
   const getAccountName = (id: string) => {
     return accounts.find(a => a.id === id)?.name || id;
   };
 
+  // Filter and sort positions
+  const filteredAndSortedPositions = useMemo(() => {
+    const getAccountNameLocal = (id: string) => {
+      return accounts.find(a => a.id === id)?.name || id;
+    };
+
+    let filtered = allPositionsList;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(({ position, accountId }) =>
+        position.symbol.toLowerCase().includes(query) ||
+        getAccountNameLocal(accountId).toLowerCase().includes(query)
+      );
+    }
+
+    // Apply side filter
+    if (filterSide !== 'all') {
+      filtered = filtered.filter(({ position }) => position.side === filterSide);
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'symbol':
+          comparison = a.position.symbol.localeCompare(b.position.symbol);
+          break;
+        case 'size':
+          comparison = a.position.notional.minus(b.position.notional).toNumber();
+          break;
+        case 'pnl':
+          comparison = a.position.unrealizedPnl.minus(b.position.unrealizedPnl).toNumber();
+          break;
+        case 'leverage':
+          comparison = a.position.leverage - b.position.leverage;
+          break;
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    return sorted;
+  }, [allPositionsList, searchQuery, filterSide, sortField, sortDirection, accounts]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <span className={`ml-1 ${sortField === field ? 'text-primary-400' : 'text-surface-600'}`}>
+      {sortField === field ? (sortDirection === 'desc' ? '↓' : '↑') : '↕'}
+    </span>
+  );
+
+  const handleExportCSV = () => {
+    if (allPositionsList.length === 0) {
+      toast.error('No positions to export');
+      return;
+    }
+
+    const headers = ['Symbol', 'Side', 'Size', 'Entry Price', 'Mark Price', 'uPnL', 'uPnL %', 'Leverage', 'Liq. Price', 'Notional', 'Exchange'];
+    const rows = filteredAndSortedPositions.map(({ accountId, position }) => {
+      const pnlPercent = position.entryPrice.isZero()
+        ? new Decimal(0)
+        : position.unrealizedPnl.dividedBy(position.size.times(position.entryPrice)).times(100);
+
+      return [
+        position.symbol,
+        position.side,
+        position.size.toString(),
+        position.entryPrice.toString(),
+        position.markPrice.toString(),
+        position.unrealizedPnl.toFixed(2),
+        pnlPercent.toFixed(2),
+        position.leverage.toString(),
+        position.liquidationPrice?.toString() || '',
+        position.notional.toFixed(2),
+        getAccountName(accountId),
+      ];
+    });
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `positions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Positions exported to CSV');
+  };
+
+  if (allPositionsList.length === 0) {
+    return null; // Don't show section if no positions at all
+  }
+
+  // Calculate totals (from filtered positions for display)
+  const totalPnl = filteredAndSortedPositions.reduce(
+    (sum, { position }) => sum.plus(position.unrealizedPnl),
+    new Decimal(0)
+  );
+
+  const totalNotional = filteredAndSortedPositions.reduce(
+    (sum, { position }) => sum.plus(position.notional),
+    new Decimal(0)
+  );
+
   return (
     <div className="card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-surface-100">Open Positions</h2>
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-surface-100">
+            Open Positions
+            {(searchQuery || filterSide !== 'all') &&
+              ` (${filteredAndSortedPositions.length} of ${allPositionsList.length})`}
+          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="input py-1.5 text-sm w-32"
+            />
+            <div className="flex gap-1">
+              {(['all', 'long', 'short'] as const).map(side => (
+                <button
+                  key={side}
+                  onClick={() => setFilterSide(side)}
+                  className={`px-3 py-1 text-sm rounded ${
+                    filterSide === side
+                      ? side === 'long' ? 'bg-profit text-white' :
+                        side === 'short' ? 'bg-loss text-white' :
+                        'bg-primary-600 text-white'
+                      : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
+                  }`}
+                >
+                  {side.charAt(0).toUpperCase() + side.slice(1)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleExportCSV}
+              className="text-xs text-primary-400 hover:text-primary-300"
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
         <div className="flex gap-4 text-sm">
           <div>
             <span className="text-surface-400">Total Notional: </span>
@@ -60,32 +202,67 @@ export function PositionsTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-surface-700">
-              <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Symbol</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Side</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Size</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Entry Price</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Mark Price</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">uPnL</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Leverage</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Liq. Price</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Exchange</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allPositionsList.map(({ accountId, position }) => (
-              <PositionRow
-                key={`${accountId}-${position.id}`}
-                position={position}
-                accountName={getAccountName(accountId)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {filteredAndSortedPositions.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-surface-400 mb-2">No positions match your filters</p>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setFilterSide('all');
+            }}
+            className="text-sm text-primary-400 hover:text-primary-300"
+          >
+            Clear all filters
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-surface-700">
+                <th
+                  className="text-left py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                  onClick={() => handleSort('symbol')}
+                >
+                  Symbol<SortIcon field="symbol" />
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Side</th>
+                <th
+                  className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                  onClick={() => handleSort('size')}
+                >
+                  Size<SortIcon field="size" />
+                </th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Entry Price</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Mark Price</th>
+                <th
+                  className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                  onClick={() => handleSort('pnl')}
+                >
+                  uPnL<SortIcon field="pnl" />
+                </th>
+                <th
+                  className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
+                  onClick={() => handleSort('leverage')}
+                >
+                  Leverage<SortIcon field="leverage" />
+                </th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">Liq. Price</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-surface-400">Exchange</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedPositions.map(({ accountId, position }) => (
+                <PositionRow
+                  key={`${accountId}-${position.id}`}
+                  position={position}
+                  accountName={getAccountName(accountId)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
