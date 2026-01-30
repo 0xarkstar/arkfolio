@@ -2,6 +2,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { useTaxStore } from '../../stores/taxStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { toast } from '../../components/Toast';
+import { Card } from '../../components/Card';
+import { Button } from '../../components/Button';
+import { SearchInput } from '../../components/SearchInput';
+import { Select } from '../../components/Input';
+import { Badge } from '../../components/Badge';
+import { Alert } from '../../components/Alert';
+import { SkeletonCard } from '../../components/Skeleton';
+import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 import Decimal from 'decimal.js';
 
 type TxSortField = 'date' | 'type' | 'asset' | 'amount' | 'gainLoss';
@@ -175,62 +183,69 @@ export function TaxPage() {
     taxableTransactions: [],
   };
 
+  const getTypeVariant = (type: string): 'success' | 'danger' | 'default' => {
+    if (type === 'BUY') return 'success';
+    if (type === 'SELL') return 'danger';
+    return 'default';
+  };
+
   return (
     <div className="space-y-6">
       {/* Year Selector */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-surface-100">Tax Year</h2>
-          <select
-            value={selectedYear}
+          <Select
+            value={selectedYear.toString()}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="input py-1"
-          >
-            {[2025, 2024, 2023, 2022].map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+            size="sm"
+            className="w-24"
+            options={[2025, 2024, 2023, 2022].map(year => ({
+              value: year.toString(),
+              label: year.toString()
+            }))}
+          />
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={handleSyncHistory}
             disabled={isSyncing || connectedAccounts.length === 0}
-            className="btn-secondary"
+            variant="secondary"
+            loading={isSyncing}
             title={connectedAccounts.length === 0 ? 'Connect exchanges first' : 'Sync transaction history from exchanges'}
           >
-            {isSyncing ? 'Syncing...' : 'Sync History'}
-          </button>
-          <button
+            Sync History
+          </Button>
+          <Button
             onClick={() => calculateTax()}
             disabled={isLoading}
-            className="btn-secondary"
+            variant="secondary"
+            loading={isLoading}
           >
-            {isLoading ? 'Calculating...' : 'Generate Report'}
-          </button>
-          <button onClick={handleExportExcel} className="btn-primary">
+            Generate Report
+          </Button>
+          <Button onClick={handleExportExcel} variant="primary">
             Export to Excel
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-loss/20 border border-loss/30 rounded-lg text-loss">
+        <Alert variant="error" onDismiss={() => {}}>
           {error}
-        </div>
+        </Alert>
       )}
 
       {syncResult && (
-        <div className="p-4 bg-profit/20 border border-profit/30 rounded-lg text-profit">
+        <Alert variant="success">
           Transaction history synced successfully. Click "Generate Report" to calculate taxes.
-        </div>
+        </Alert>
       )}
 
       {connectedAccounts.length === 0 && (
-        <div className="p-4 bg-warning/20 border border-warning/30 rounded-lg text-warning">
+        <Alert variant="warning">
           No exchanges connected. Connect exchanges to sync transaction history for tax calculation.
-        </div>
+        </Alert>
       )}
 
       {/* Tax Summary */}
@@ -238,44 +253,41 @@ export function TaxPage() {
         {isLoading && !summary ? (
           <>
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="card p-4 animate-pulse">
-                <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
-                <div className="h-6 w-32 bg-surface-600 rounded" />
-              </div>
+              <SkeletonCard key={i} />
             ))}
           </>
         ) : (
           <>
-            <div className="card p-4">
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Total Gains</p>
               <p className="text-xl font-bold text-profit font-tabular">
                 {formatKrw(displaySummary.totalGainsKrw)}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Total Losses</p>
               <p className="text-xl font-bold text-loss font-tabular">
                 {formatKrw(displaySummary.totalLossesKrw)}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Net Gains</p>
               <p className="text-xl font-bold text-surface-100 font-tabular">
                 {formatKrw(displaySummary.netGainsKrw)}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Estimated Tax (22%)</p>
               <p className="text-xl font-bold text-warning font-tabular">
                 {formatKrw(displaySummary.estimatedTaxKrw)}
               </p>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Tax Calculation Breakdown */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h3 className="text-lg font-semibold text-surface-100 mb-4">Tax Calculation</h3>
         <div className="space-y-3">
           <div className="flex justify-between py-2 border-b border-surface-800">
@@ -322,10 +334,10 @@ export function TaxPage() {
         <p className="text-xs text-surface-500">
           * 세율 22% (지방소득세 포함) 적용
         </p>
-      </div>
+      </Card>
 
       {/* Transaction History */}
-      <div className="card p-6">
+      <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h3 className="text-lg font-semibold text-surface-100">
             Taxable Transactions
@@ -334,29 +346,28 @@ export function TaxPage() {
             {!searchQuery && filterType === 'all' && ` (${displaySummary.totalTransactions})`}
           </h3>
           <div className="flex items-center gap-3">
-            <input
-              type="text"
+            <SearchInput
               placeholder="Search..."
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setDisplayLimit(50); // Reset pagination on search
+              onChange={(value) => {
+                setSearchQuery(value);
+                setDisplayLimit(50);
               }}
-              className="input py-1.5 text-sm w-32"
+              size="sm"
+              className="w-32"
             />
-            <select
+            <Select
               value={filterType}
               onChange={(e) => {
                 setFilterType(e.target.value);
                 setDisplayLimit(50);
               }}
-              className="input py-1.5 text-sm"
-            >
-              <option value="all">All Types</option>
-              {uniqueTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+              size="sm"
+              options={[
+                { value: 'all', label: 'All Types' },
+                ...uniqueTypes.map(type => ({ value: type, label: type }))
+              ]}
+            />
           </div>
         </div>
 
@@ -365,26 +376,17 @@ export function TaxPage() {
             <div className="text-surface-400">Calculating tax...</div>
           </div>
         ) : displaySummary.totalTransactions === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">&#128203;</div>
-            <p className="text-surface-400 mb-2">No taxable transactions found</p>
-            <p className="text-surface-500 text-sm">
-              Connect exchanges and sync transactions to calculate taxes.
-            </p>
-          </div>
+          <NoDataEmptyState
+            onAction={() => {}}
+          />
         ) : filteredAndSortedTransactions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-surface-400 mb-2">No transactions match your filters</p>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterType('all');
-              }}
-              className="text-sm text-primary-400 hover:text-primary-300"
-            >
-              Clear all filters
-            </button>
-          </div>
+          <NoResultsEmptyState
+            searchTerm={searchQuery}
+            onClear={() => {
+              setSearchQuery('');
+              setFilterType('all');
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -437,17 +439,9 @@ export function TaxPage() {
                         : new Date(tx.date).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          tx.type === 'BUY'
-                            ? 'bg-profit/20 text-profit'
-                            : tx.type === 'SELL'
-                            ? 'bg-loss/20 text-loss'
-                            : 'bg-surface-700 text-surface-300'
-                        }`}
-                      >
+                      <Badge variant={getTypeVariant(tx.type)} size="sm">
                         {tx.type}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="py-3 px-4 font-medium text-surface-100">
                       {tx.asset}
@@ -480,32 +474,33 @@ export function TaxPage() {
 
         {filteredAndSortedTransactions.length > displayLimit && (
           <div className="flex justify-center mt-4">
-            <button
+            <Button
               onClick={() => setDisplayLimit((prev) => prev + 50)}
-              className="text-sm text-primary-400 hover:text-primary-300"
+              variant="ghost"
+              size="sm"
             >
               Load More ({filteredAndSortedTransactions.length - displayLimit} remaining)
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* HomeTax Export Info */}
-      <div className="card p-6 border-primary-600/30 bg-primary-600/5">
+      <Card className="p-6 border-primary-600/30 bg-primary-600/5">
         <h3 className="text-lg font-semibold text-surface-100 mb-2">HomeTax Export</h3>
         <p className="text-surface-400 text-sm mb-4">
           Export your transaction data in a format compatible with the Korean National Tax
           Service (HomeTax).
         </p>
         <div className="flex gap-3">
-          <button onClick={handleExportCSV} className="btn-primary">
+          <Button onClick={handleExportCSV} variant="primary">
             가상자산 거래명세서 (CSV)
-          </button>
-          <button onClick={handleExportExcel} className="btn-secondary">
+          </Button>
+          <Button onClick={handleExportExcel} variant="secondary">
             연간 집계표 (Excel)
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

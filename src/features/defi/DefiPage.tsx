@@ -2,6 +2,15 @@ import { useEffect, useState, useMemo } from 'react';
 import { useDefiStore, DefiPosition } from '../../stores/defiStore';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { Card } from '../../components/Card';
+import { Button } from '../../components/Button';
+import { SearchInput } from '../../components/SearchInput';
+import { Select, Input } from '../../components/Input';
+import { Badge } from '../../components/Badge';
+import { Alert } from '../../components/Alert';
+import { Modal, ModalFooter } from '../../components/Modal';
+import { SkeletonCard } from '../../components/Skeleton';
+import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 import Decimal from 'decimal.js';
 
 type SortField = 'protocol' | 'value' | 'apy' | 'type';
@@ -427,27 +436,6 @@ export function DefiPage() {
     }).format(num);
   };
 
-  const getPositionTypeColor = (type: string) => {
-    switch (type) {
-      case 'lp':
-        return 'bg-blue-500/20 text-blue-400';
-      case 'lending':
-        return 'bg-green-500/20 text-green-400';
-      case 'borrowing':
-        return 'bg-red-500/20 text-red-400';
-      case 'pt':
-      case 'yt':
-        return 'bg-purple-500/20 text-purple-400';
-      case 'restaking':
-        return 'bg-orange-500/20 text-orange-400';
-      case 'staking':
-        return 'bg-yellow-500/20 text-yellow-400';
-      case 'vault':
-      default:
-        return 'bg-surface-700 text-surface-300';
-    }
-  };
-
   const getPositionTypeLabel = (type: string) => {
     switch (type) {
       case 'lp':
@@ -471,59 +459,65 @@ export function DefiPage() {
     }
   };
 
+  const getPositionTypeVariant = (type: string): 'info' | 'success' | 'danger' | 'warning' | 'default' => {
+    switch (type) {
+      case 'lp':
+        return 'info';
+      case 'lending':
+        return 'success';
+      case 'borrowing':
+        return 'danger';
+      case 'pt':
+      case 'yt':
+      case 'restaking':
+        return 'warning';
+      case 'staking':
+      case 'vault':
+      default:
+        return 'default';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {isLoading && positions.length === 0 ? (
           <>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-32 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-24 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-16 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-16 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-20 bg-surface-600 rounded" />
-            </div>
-            <div className="card p-4 animate-pulse">
-              <div className="h-4 w-20 bg-surface-700 rounded mb-2" />
-              <div className="h-8 w-12 bg-surface-600 rounded" />
-            </div>
+            {[1, 2, 3, 4].map(i => (
+              <SkeletonCard key={i} />
+            ))}
           </>
         ) : (
           <>
-            <div className="card p-4">
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Total DeFi Value</p>
               <p className="text-2xl font-bold text-surface-100 font-tabular">
                 {formatCurrency(totalValue)}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Active Positions</p>
               <p className="text-2xl font-bold text-surface-100">{positions.length}</p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Avg. APY</p>
               <p className="text-2xl font-bold text-profit">
                 {isNaN(avgApy) ? '-' : `${avgApy.toFixed(1)}%`}
               </p>
-            </div>
-            <div className="card p-4">
+            </Card>
+            <Card className="p-4">
               <p className="text-sm text-surface-400">Protocols</p>
               <p className="text-2xl font-bold text-surface-100">
                 {new Set(positions.map((p) => p.protocol)).size}
               </p>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Positions Table */}
-      <div className="card p-6">
+      <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h2 className="text-lg font-semibold text-surface-100">
             DeFi Positions
@@ -531,47 +525,47 @@ export function DefiPage() {
               ` (${filteredAndSortedPositions.length} of ${positions.length})`}
           </h2>
           <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="text"
+            <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder="Search..."
-              className="input py-1.5 text-sm w-32"
+              size="sm"
+              className="w-32"
             />
-            <select
+            <Select
               value={filterChain}
               onChange={(e) => setFilterChain(e.target.value)}
-              className="input py-1.5 text-sm"
-            >
-              <option value="all">All Chains</option>
-              {uniqueChains.map(chain => (
-                <option key={chain} value={chain}>{chain}</option>
-              ))}
-            </select>
-            <select
+              size="sm"
+              options={[
+                { value: 'all', label: 'All Chains' },
+                ...uniqueChains.map(chain => ({ value: chain, label: chain }))
+              ]}
+            />
+            <Select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="input py-1.5 text-sm"
-            >
-              <option value="all">All Types</option>
-              {uniqueTypes.map(type => (
-                <option key={type} value={type}>{getPositionTypeLabel(type)}</option>
-              ))}
-            </select>
+              size="sm"
+              options={[
+                { value: 'all', label: 'All Types' },
+                ...uniqueTypes.map(type => ({ value: type, label: getPositionTypeLabel(type) }))
+              ]}
+            />
             {positions.length > 0 && (
-              <button
+              <Button
                 onClick={handleExportCSV}
-                className="text-xs text-primary-400 hover:text-primary-300"
+                variant="ghost"
+                size="xs"
               >
                 Export CSV
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="btn-secondary text-sm"
+              variant="secondary"
+              size="sm"
             >
               Add Position
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -580,27 +574,16 @@ export function DefiPage() {
             <div className="text-surface-400">Loading positions...</div>
           </div>
         ) : positions.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">&#127793;</div>
-            <p className="text-surface-400 mb-2">No DeFi positions tracked</p>
-            <p className="text-surface-500 text-sm">
-              Add your wallet addresses to track DeFi positions.
-            </p>
-          </div>
+          <NoDataEmptyState onAction={() => setShowAddModal(true)} />
         ) : filteredAndSortedPositions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-surface-400 mb-2">No positions match your filters</p>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterChain('all');
-                setFilterType('all');
-              }}
-              className="text-sm text-primary-400 hover:text-primary-300"
-            >
-              Clear all filters
-            </button>
-          </div>
+          <NoResultsEmptyState
+            searchTerm={searchQuery}
+            onClear={() => {
+              setSearchQuery('');
+              setFilterChain('all');
+              setFilterType('all');
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -654,21 +637,15 @@ export function DefiPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${getPositionTypeColor(
-                          position.positionType
-                        )}`}
-                      >
+                      <Badge variant={getPositionTypeVariant(position.positionType)} size="sm">
                         {getPositionTypeLabel(position.positionType)}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="py-3 px-4 text-surface-300">
                       {position.assets.join('/')}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 bg-surface-700 rounded text-xs text-surface-300">
-                        {position.chain}
-                      </span>
+                      <Badge size="sm">{position.chain}</Badge>
                     </td>
                     <td className="py-3 px-4 text-right font-tabular text-surface-100">
                       {formatCurrency(position.currentValueUsd)}
@@ -695,13 +672,15 @@ export function DefiPage() {
                     </td>
                     <td className="py-3 px-4">
                       {position.walletId === 'manual' && (
-                        <button
+                        <Button
                           onClick={(e) => { e.stopPropagation(); handleRemovePosition(position); }}
-                          className="text-surface-500 hover:text-loss transition-colors"
+                          variant="ghost"
+                          size="xs"
+                          className="text-surface-500 hover:text-loss"
                           title="Remove position"
                         >
                           &times;
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -710,18 +689,19 @@ export function DefiPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Points Tracking */}
-      <div className="card p-6">
+      <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-100">Points & Airdrops</h2>
-          <button
+          <Button
             onClick={() => setShowPointsModal(true)}
-            className="btn-secondary text-sm"
+            variant="secondary"
+            size="sm"
           >
             Add Points
-          </button>
+          </Button>
         </div>
         {pointsBalances.length === 0 ? (
           <div className="text-center py-8">
@@ -737,7 +717,7 @@ export function DefiPage() {
               <div key={point.id} className="bg-surface-800 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-surface-100">{point.protocol}</span>
-                  <span className="text-xs text-surface-400">Points</span>
+                  <Badge size="sm">Points</Badge>
                 </div>
                 <p className="text-2xl font-bold text-primary-400 font-tabular">
                   {point.pointsBalance.toNumber().toLocaleString()}
@@ -751,10 +731,10 @@ export function DefiPage() {
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Risk Overview */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Risk Overview</h2>
         <div className="bg-surface-800 rounded-lg p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -830,11 +810,11 @@ export function DefiPage() {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Coming Soon Notice */}
       {storePositions.length === 0 && (
-        <div className="card p-6 border-primary-600/30 bg-primary-600/5">
+        <Card className="p-6 border-primary-600/30 bg-primary-600/5">
           <h3 className="text-lg font-semibold text-surface-100 mb-2">
             DeFi Position Tracking
           </h3>
@@ -844,280 +824,193 @@ export function DefiPage() {
             Supported protocols: Uniswap, Aave, Morpho, Pendle, EigenLayer, and more.
           </p>
           <div className="flex gap-3">
-            <button className="btn-secondary" onClick={() => setShowAddModal(true)}>
+            <Button variant="secondary" onClick={() => setShowAddModal(true)}>
               Add Position Manually
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Add Position Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-surface-100">Add DeFi Position</h2>
-              <button
-                onClick={() => { setShowAddModal(false); resetForm(); }}
-                className="text-surface-400 hover:text-surface-100 text-2xl"
-              >
-                &times;
-              </button>
-            </div>
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => { setShowAddModal(false); resetForm(); }}
+        title="Add DeFi Position"
+        size="lg"
+      >
+        {addError && (
+          <Alert variant="error" className="mb-4">
+            {addError}
+          </Alert>
+        )}
 
-            {addError && (
-              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
-                {addError}
-              </div>
-            )}
+        <form onSubmit={handleAddPosition} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Protocol"
+              value={formProtocol}
+              onChange={(e) => setFormProtocol(e.target.value)}
+              options={PROTOCOLS.map(p => ({ value: p, label: p }))}
+            />
 
-            <form onSubmit={handleAddPosition} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Protocol
-                  </label>
-                  <select
-                    value={formProtocol}
-                    onChange={(e) => setFormProtocol(e.target.value)}
-                    className="input w-full"
-                  >
-                    {PROTOCOLS.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Position Type
-                  </label>
-                  <select
-                    value={formType}
-                    onChange={(e) => setFormType(e.target.value as DefiPosition['positionType'])}
-                    className="input w-full"
-                  >
-                    {POSITION_TYPES.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Chain
-                </label>
-                <select
-                  value={formChain}
-                  onChange={(e) => setFormChain(e.target.value)}
-                  className="input w-full"
-                >
-                  {CHAINS.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Assets (comma separated)
-                </label>
-                <input
-                  type="text"
-                  value={formAssets}
-                  onChange={(e) => setFormAssets(e.target.value)}
-                  placeholder="ETH, USDC"
-                  className="input w-full"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Amount (primary asset)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formAmount}
-                    onChange={(e) => setFormAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="input w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Current Value (USD)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formValue}
-                    onChange={(e) => setFormValue(e.target.value)}
-                    placeholder="0.00"
-                    className="input w-full"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Cost Basis (USD)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formCostBasis}
-                    onChange={(e) => setFormCostBasis(e.target.value)}
-                    placeholder="Optional"
-                    className="input w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    APY (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formApy}
-                    onChange={(e) => setFormApy(e.target.value)}
-                    placeholder="Optional"
-                    className="input w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1">
-                    Health Factor
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formHealthFactor}
-                    onChange={(e) => setFormHealthFactor(e.target.value)}
-                    placeholder="Optional"
-                    className="input w-full"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowAddModal(false); resetForm(); }}
-                  className="btn-secondary flex-1"
-                  disabled={isAdding}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex-1"
-                  disabled={isAdding}
-                >
-                  {isAdding ? 'Adding...' : 'Add Position'}
-                </button>
-              </div>
-            </form>
+            <Select
+              label="Position Type"
+              value={formType}
+              onChange={(e) => setFormType(e.target.value as DefiPosition['positionType'])}
+              options={POSITION_TYPES.map(t => ({ value: t.value, label: t.label }))}
+            />
           </div>
-        </div>
-      )}
+
+          <Select
+            label="Chain"
+            value={formChain}
+            onChange={(e) => setFormChain(e.target.value)}
+            options={CHAINS.map(c => ({ value: c, label: c }))}
+          />
+
+          <Input
+            label="Assets (comma separated)"
+            type="text"
+            value={formAssets}
+            onChange={(e) => setFormAssets(e.target.value)}
+            placeholder="ETH, USDC"
+            required
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Amount (primary asset)"
+              type="number"
+              step="any"
+              value={formAmount}
+              onChange={(e) => setFormAmount(e.target.value)}
+              placeholder="0.00"
+            />
+
+            <Input
+              label="Current Value (USD)"
+              type="number"
+              step="any"
+              value={formValue}
+              onChange={(e) => setFormValue(e.target.value)}
+              placeholder="0.00"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Cost Basis (USD)"
+              type="number"
+              step="any"
+              value={formCostBasis}
+              onChange={(e) => setFormCostBasis(e.target.value)}
+              placeholder="Optional"
+            />
+
+            <Input
+              label="APY (%)"
+              type="number"
+              step="any"
+              value={formApy}
+              onChange={(e) => setFormApy(e.target.value)}
+              placeholder="Optional"
+            />
+
+            <Input
+              label="Health Factor"
+              type="number"
+              step="any"
+              value={formHealthFactor}
+              onChange={(e) => setFormHealthFactor(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+
+          <ModalFooter>
+            <Button
+              type="button"
+              onClick={() => { setShowAddModal(false); resetForm(); }}
+              variant="secondary"
+              disabled={isAdding}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isAdding}
+              loading={isAdding}
+            >
+              Add Position
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       {/* Add Points Modal */}
-      {showPointsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-surface-100">Add Points</h2>
-              <button
-                onClick={() => { setShowPointsModal(false); resetPointsForm(); }}
-                className="text-surface-400 hover:text-surface-100 text-2xl"
-              >
-                &times;
-              </button>
-            </div>
+      <Modal
+        isOpen={showPointsModal}
+        onClose={() => { setShowPointsModal(false); resetPointsForm(); }}
+        title="Add Points"
+        size="md"
+      >
+        {addError && (
+          <Alert variant="error" className="mb-4">
+            {addError}
+          </Alert>
+        )}
 
-            {addError && (
-              <div className="mb-4 p-3 bg-loss/20 border border-loss/30 rounded text-loss text-sm">
-                {addError}
-              </div>
-            )}
+        <form onSubmit={handleAddPoints} className="space-y-4">
+          <Input
+            label="Protocol Name"
+            type="text"
+            value={pointsProtocol}
+            onChange={(e) => setPointsProtocol(e.target.value)}
+            placeholder="e.g., EigenLayer, Renzo, Ethena"
+            required
+          />
 
-            <form onSubmit={handleAddPoints} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Protocol Name
-                </label>
-                <input
-                  type="text"
-                  value={pointsProtocol}
-                  onChange={(e) => setPointsProtocol(e.target.value)}
-                  placeholder="e.g., EigenLayer, Renzo, Ethena"
-                  className="input w-full"
-                  required
-                />
-              </div>
+          <Input
+            label="Points Balance"
+            type="number"
+            step="any"
+            value={pointsBalance}
+            onChange={(e) => setPointsBalance(e.target.value)}
+            placeholder="0"
+            required
+          />
 
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Points Balance
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={pointsBalance}
-                  onChange={(e) => setPointsBalance(e.target.value)}
-                  placeholder="0"
-                  className="input w-full"
-                  required
-                />
-              </div>
+          <Input
+            label="Estimated Value (USD) - Optional"
+            hint="Your estimate of the potential airdrop value"
+            type="number"
+            step="any"
+            value={pointsEstValue}
+            onChange={(e) => setPointsEstValue(e.target.value)}
+            placeholder="0.00"
+          />
 
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Estimated Value (USD) - Optional
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={pointsEstValue}
-                  onChange={(e) => setPointsEstValue(e.target.value)}
-                  placeholder="0.00"
-                  className="input w-full"
-                />
-                <p className="text-xs text-surface-500 mt-1">
-                  Your estimate of the potential airdrop value
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowPointsModal(false); resetPointsForm(); }}
-                  className="btn-secondary flex-1"
-                  disabled={isAdding}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex-1"
-                  disabled={isAdding}
-                >
-                  {isAdding ? 'Adding...' : 'Add Points'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          <ModalFooter>
+            <Button
+              type="button"
+              onClick={() => { setShowPointsModal(false); resetPointsForm(); }}
+              variant="secondary"
+              disabled={isAdding}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isAdding}
+              loading={isAdding}
+            >
+              Add Points
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       {/* Remove Position Confirm Dialog */}
       <ConfirmDialog

@@ -4,6 +4,12 @@ import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useWalletsStore } from '../../stores/walletsStore';
 import { useDefiStore } from '../../stores/defiStore';
 import { toast } from '../../components/Toast';
+import { Card } from '../../components/Card';
+import { Button } from '../../components/Button';
+import { Badge } from '../../components/Badge';
+import { Alert } from '../../components/Alert';
+import { SkeletonCard } from '../../components/Skeleton';
+import { ProgressBar } from '../../components/ProgressBar';
 import Decimal from 'decimal.js';
 
 export function RiskPage() {
@@ -217,19 +223,22 @@ export function RiskPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             onClick={() => refreshData(true)}
             disabled={isRefreshing}
-            className="text-sm text-primary-400 hover:text-primary-300 disabled:opacity-50"
+            variant="ghost"
+            size="sm"
+            loading={isRefreshing}
           >
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-          <button
+            Refresh
+          </Button>
+          <Button
             onClick={handleExportCSV}
-            className="text-sm text-primary-400 hover:text-primary-300"
+            variant="ghost"
+            size="sm"
           >
             Export CSV
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -237,31 +246,16 @@ export function RiskPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {isLoading && holdings.length === 0 ? (
           <>
-            <div className="card p-6 md:col-span-1 animate-pulse">
-              <div className="h-4 w-32 bg-surface-700 rounded mb-4" />
-              <div className="flex items-end gap-4">
-                <div className="w-24 h-24 bg-surface-700 rounded-full" />
-                <div>
-                  <div className="h-6 w-20 bg-surface-700 rounded mb-2" />
-                  <div className="h-4 w-16 bg-surface-700 rounded" />
-                </div>
-              </div>
+            <div className="md:col-span-1">
+              <SkeletonCard />
             </div>
-            <div className="card p-6 md:col-span-2 animate-pulse">
-              <div className="h-4 w-24 bg-surface-700 rounded mb-4" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="text-center">
-                    <div className="h-8 w-16 bg-surface-700 rounded mx-auto mb-2" />
-                    <div className="h-4 w-20 bg-surface-700 rounded mx-auto" />
-                  </div>
-                ))}
-              </div>
+            <div className="md:col-span-2">
+              <SkeletonCard />
             </div>
           </>
         ) : (
           <>
-            <div className="card p-6 md:col-span-1">
+            <Card className="p-6 md:col-span-1">
               <p className="text-sm text-surface-400 mb-2">Overall Risk Score</p>
               <div className="flex items-end gap-4">
                 <div className="relative">
@@ -295,9 +289,9 @@ export function RiskPage() {
                   <p className="text-sm text-surface-400">Risk Level</p>
                 </div>
               </div>
-            </div>
+            </Card>
 
-            <div className="card p-6 md:col-span-2">
+            <Card className="p-6 md:col-span-2">
               <p className="text-sm text-surface-400 mb-4">Risk Factors</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <RiskFactor
@@ -323,13 +317,13 @@ export function RiskPage() {
                   status={totalILExposure.isZero() ? 'good' : totalILExposure.div(totalValue).greaterThan(0.3) ? 'danger' : 'warning'}
                 />
               </div>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Futures Positions */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Futures Exposure</h2>
         {futuresPositions.length === 0 ? (
           <div className="text-center py-8 text-surface-500">
@@ -389,11 +383,9 @@ export function RiskPage() {
                       <tr key={`${position.symbol}-${idx}`} className="border-b border-surface-800 hover:bg-surface-800/50">
                         <td className="py-3 px-4 font-medium text-surface-100">{position.symbol}</td>
                         <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            position.side === 'long' ? 'bg-profit/20 text-profit' : 'bg-loss/20 text-loss'
-                          }`}>
+                          <Badge variant={position.side === 'long' ? 'success' : 'danger'} size="sm">
                             {position.side.toUpperCase()}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="py-3 px-4 text-right font-tabular text-surface-300">
                           {Math.abs(size).toFixed(4)}
@@ -418,10 +410,10 @@ export function RiskPage() {
             </div>
           </>
         )}
-      </div>
+      </Card>
 
       {/* DeFi Health */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">DeFi Health</h2>
         {lendingPositions.length === 0 ? (
           <div className="text-center py-8 text-surface-500">
@@ -453,24 +445,23 @@ export function RiskPage() {
                   </div>
                 </div>
                 {position.healthFactor && (
-                  <div className="h-2 bg-surface-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${
-                        position.healthFactor > 2 ? 'bg-profit' :
-                        position.healthFactor > 1.5 ? 'bg-warning' : 'bg-loss'
-                      }`}
-                      style={{ width: `${Math.min(position.healthFactor * 33, 100)}%` }}
-                    />
-                  </div>
+                  <ProgressBar
+                    value={Math.min(position.healthFactor * 33, 100)}
+                    variant={
+                      position.healthFactor > 2 ? 'success' :
+                      position.healthFactor > 1.5 ? 'warning' : 'danger'
+                    }
+                    size="sm"
+                  />
                 )}
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Asset Concentration */}
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Concentration</h2>
         {holdings.length === 0 ? (
           <div className="text-center py-8 text-surface-500">
@@ -487,14 +478,15 @@ export function RiskPage() {
                   <div className="w-12 text-sm font-medium text-surface-300">
                     {holding.symbol}
                   </div>
-                  <div className="flex-1 h-4 bg-surface-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${
-                        percent > 50 ? 'bg-loss' :
-                        percent > 30 ? 'bg-warning' :
-                        'bg-primary-500'
-                      }`}
-                      style={{ width: `${percent}%` }}
+                  <div className="flex-1">
+                    <ProgressBar
+                      value={percent}
+                      variant={
+                        percent > 50 ? 'danger' :
+                        percent > 30 ? 'warning' :
+                        'primary'
+                      }
+                      size="md"
                     />
                   </div>
                   <div className="w-20 text-right">
@@ -511,49 +503,39 @@ export function RiskPage() {
             })}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Risk Recommendations */}
-      <div className="card p-6 border-primary-600/30 bg-primary-600/5">
+      <Card className="p-6 border-primary-600/30 bg-primary-600/5">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Recommendations</h2>
         <div className="space-y-3">
           {riskScore < 20 && (
-            <RecommendationItem
-              type="info"
-              title="Portfolio looks healthy"
-              description="Your risk metrics are within acceptable ranges. Continue monitoring regularly."
-            />
+            <Alert variant="info" title="Portfolio looks healthy">
+              Your risk metrics are within acceptable ranges. Continue monitoring regularly.
+            </Alert>
           )}
           {topHoldingPercent > 50 && (
-            <RecommendationItem
-              type="warning"
-              title="High concentration risk"
-              description={`${topHolding?.symbol} represents ${topHoldingPercent.toFixed(1)}% of your portfolio. Consider diversifying.`}
-            />
+            <Alert variant="warning" title="High concentration risk">
+              {topHolding?.symbol} represents {topHoldingPercent.toFixed(1)}% of your portfolio. Consider diversifying.
+            </Alert>
           )}
           {lowestHealthResult && lowestHealthResult.value < 1.5 && (
-            <RecommendationItem
-              type="danger"
-              title="Low health factor detected"
-              description={`Your ${lowestHealthResult.position.protocol} position has a health factor of ${lowestHealthResult.value.toFixed(2)}. Consider adding collateral or reducing debt.`}
-            />
+            <Alert variant="error" title="Low health factor detected">
+              Your {lowestHealthResult.position.protocol} position has a health factor of {lowestHealthResult.value.toFixed(2)}. Consider adding collateral or reducing debt.
+            </Alert>
           )}
           {totalFuturesExposure / totalValue.toNumber() > 2 && (
-            <RecommendationItem
-              type="warning"
-              title="High leverage exposure"
-              description="Your futures exposure exceeds 2x your portfolio value. Consider reducing position sizes."
-            />
+            <Alert variant="warning" title="High leverage exposure">
+              Your futures exposure exceeds 2x your portfolio value. Consider reducing position sizes.
+            </Alert>
           )}
           {totalUnrealizedPnl < -totalValue.toNumber() * 0.1 && (
-            <RecommendationItem
-              type="danger"
-              title="Significant unrealized losses"
-              description="Your unrealized losses exceed 10% of portfolio value. Review your positions and consider stop-losses."
-            />
+            <Alert variant="error" title="Significant unrealized losses">
+              Your unrealized losses exceed 10% of portfolio value. Review your positions and consider stop-losses.
+            </Alert>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -575,35 +557,6 @@ function RiskFactor({ label, value, status }: RiskFactorProps) {
     <div className="text-center">
       <p className={`text-2xl font-bold font-tabular ${colors[status]}`}>{value}</p>
       <p className="text-sm text-surface-400">{label}</p>
-    </div>
-  );
-}
-
-interface RecommendationItemProps {
-  type: 'info' | 'warning' | 'danger';
-  title: string;
-  description: string;
-}
-
-function RecommendationItem({ type, title, description }: RecommendationItemProps) {
-  const icons = {
-    info: '&#9432;',
-    warning: '&#9888;',
-    danger: '&#9888;',
-  };
-  const colors = {
-    info: 'text-primary-400',
-    warning: 'text-warning',
-    danger: 'text-loss',
-  };
-
-  return (
-    <div className="flex gap-3">
-      <span className={`text-xl ${colors[type]}`} dangerouslySetInnerHTML={{ __html: icons[type] }} />
-      <div>
-        <p className="font-medium text-surface-100">{title}</p>
-        <p className="text-sm text-surface-400">{description}</p>
-      </div>
     </div>
   );
 }
