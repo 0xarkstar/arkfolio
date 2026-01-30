@@ -14,6 +14,8 @@ import { RiskPage } from './features/risk';
 import { TaxPage } from './features/tax';
 import { SettingsPage } from './features/settings';
 import { ToastContainer } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { KeyboardShortcuts, useKeyboardNavigation } from './components/KeyboardShortcuts';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +44,9 @@ function App() {
 
   // Enable auto-sync when database is ready
   useAutoSync();
+
+  // Enable keyboard navigation
+  useKeyboardNavigation();
 
   if (isLoading) {
     return (
@@ -75,9 +80,12 @@ function App() {
   return (
     <>
       <MainLayout>
-        <PageRouter currentView={currentView} />
+        <ErrorBoundary>
+          <PageRouter currentView={currentView} />
+        </ErrorBoundary>
       </MainLayout>
       <ToastContainer />
+      <KeyboardShortcuts />
     </>
   );
 }
