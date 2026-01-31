@@ -10,6 +10,7 @@ const shortcuts: Shortcut[] = [
   { keys: ['⌘', 'K'], description: 'Open global search' },
   { keys: ['Esc'], description: 'Close modal / Clear search' },
   { keys: ['?'], description: 'Show keyboard shortcuts' },
+  { keys: ['R'], description: 'Refresh current view' },
   { keys: ['1'], description: 'Go to Dashboard' },
   { keys: ['2'], description: 'Go to Portfolio' },
   { keys: ['3'], description: 'Go to Exchanges' },
@@ -85,6 +86,21 @@ export function KeyboardShortcuts() {
   );
 }
 
+// Custom event for refresh action
+export const REFRESH_EVENT = 'arkfolio:refresh';
+
+export function triggerRefresh() {
+  window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
+}
+
+export function useRefreshShortcut(onRefresh: () => void) {
+  useEffect(() => {
+    const handleRefresh = () => onRefresh();
+    window.addEventListener(REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(REFRESH_EVENT, handleRefresh);
+  }, [onRefresh]);
+}
+
 export function useKeyboardNavigation() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -126,6 +142,11 @@ export function useKeyboardNavigation() {
             break;
           case '8':
             setView('settings');
+            break;
+          case 'r':
+          case 'R':
+            // Trigger refresh event
+            triggerRefresh();
             break;
         }
       }

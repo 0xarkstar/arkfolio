@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useExchangeStore, ExchangeAccount } from '../../../stores/exchangeStore';
+import { useExchangeStore, ExchangeAccount, WebSocketStatus } from '../../../stores/exchangeStore';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '../../../components/Toast';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -10,6 +10,7 @@ import { Alert } from '../../../components/Alert';
 import { SkeletonCard } from '../../../components/Skeleton';
 import { Badge } from '../../../components/Badge';
 import { NoConnectionEmptyState } from '../../../components/EmptyState';
+import { Tooltip } from '../../../components/Tooltip';
 
 interface ExchangeListProps {
   onAddExchange: () => void;
@@ -112,6 +113,7 @@ function ExchangeCard({ account, onSync, onRemove }: ExchangeCardProps) {
               >
                 {account.isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
+              <WebSocketStatusIndicator status={account.wsStatus} />
               {account.lastSync && (
                 <span className="text-surface-500">
                   Synced {formatDistanceToNow(account.lastSync, { addSuffix: true })}
@@ -203,5 +205,40 @@ function TrashIcon() {
       <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
       <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
     </svg>
+  );
+}
+
+interface WebSocketStatusIndicatorProps {
+  status: WebSocketStatus;
+}
+
+function WebSocketStatusIndicator({ status }: WebSocketStatusIndicatorProps) {
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'connected':
+        return { color: 'bg-green-500', label: 'Real-time updates active', icon: '🟢' };
+      case 'connecting':
+        return { color: 'bg-yellow-500', label: 'Connecting to real-time...', icon: '🟡' };
+      case 'error':
+        return { color: 'bg-red-500', label: 'Real-time connection error', icon: '🔴' };
+      case 'disconnected':
+      default:
+        return { color: 'bg-gray-500', label: 'Real-time updates off', icon: '⚪' };
+    }
+  };
+
+  const config = getStatusConfig();
+
+  return (
+    <Tooltip content={config.label}>
+      <span className="flex items-center gap-1 text-xs cursor-help">
+        <span
+          className={`w-2 h-2 rounded-full ${config.color} ${
+            status === 'connecting' ? 'animate-pulse' : ''
+          }`}
+        />
+        <span className="text-surface-500">WS</span>
+      </span>
+    </Tooltip>
   );
 }

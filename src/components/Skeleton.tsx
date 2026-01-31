@@ -114,3 +114,58 @@ export function SkeletonAssetRow() {
     </div>
   );
 }
+
+// Loading spinner with optional message
+export function LoadingSpinner({
+  size = 'md',
+  message,
+  className = '',
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  message?: string;
+  className?: string;
+}) {
+  const sizeStyles = {
+    sm: 'w-4 h-4 border-2',
+    md: 'w-8 h-8 border-3',
+    lg: 'w-12 h-12 border-4',
+  };
+
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
+      <div
+        className={`${sizeStyles[size]} border-surface-600 border-t-primary-500 rounded-full animate-spin`}
+      />
+      {message && <p className="text-sm text-surface-400">{message}</p>}
+    </div>
+  );
+}
+
+// Full-page loading state
+export function PageLoading({ message = 'Loading...' }: { message?: string }) {
+  return (
+    <div className="flex items-center justify-center min-h-[200px] py-12">
+      <LoadingSpinner size="lg" message={message} />
+    </div>
+  );
+}
+
+// Inline loading state for sections
+export function SectionLoading({ message = 'Loading...' }: { message?: string }) {
+  return (
+    <div className="flex items-center justify-center py-8">
+      <LoadingSpinner size="md" message={message} />
+    </div>
+  );
+}
+
+// Skeleton grid for dashboard cards
+export function SkeletonDashboardGrid({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  );
+}

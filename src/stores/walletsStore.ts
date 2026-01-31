@@ -4,18 +4,29 @@ import { getDb, generateId } from '../database/init';
 import { wallets, onchainAssets } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { walletService, Chain, WalletSummary, TokenBalance, NativeBalance } from '../services/blockchain';
+import { getEVMChains } from '../services/blockchain/chains';
+
+// Wallet types: EVM (all EVM chains) or SOLANA
+export type WalletType = 'EVM' | 'SOLANA';
 
 export interface StoredWallet {
   id: string;
   address: string;
-  chain: Chain;
+  walletType: WalletType;
   label: string;
   createdAt: Date;
 }
 
-export interface WalletWithBalances extends StoredWallet {
+// Balances per chain
+export interface ChainBalance {
+  chain: Chain;
   nativeBalance: NativeBalance | null;
   tokenBalances: TokenBalance[];
+  totalValueUsd: Decimal;
+}
+
+export interface WalletWithBalances extends StoredWallet {
+  chainBalances: ChainBalance[];
   totalValueUsd: Decimal;
   isLoading: boolean;
   lastSync: Date | null;
@@ -32,7 +43,7 @@ interface WalletsState {
 
   // Actions
   loadWallets: () => Promise<void>;
-  addWallet: (address: string, chain: Chain, label: string) => Promise<string>;
+  addWallet: (address: string, label?: string) => Promise<string>;
   removeWallet: (walletId: string) => Promise<void>;
   syncWallet: (walletId: string) => Promise<void>;
   syncAllWallets: () => Promise<void>;
@@ -40,14 +51,30 @@ interface WalletsState {
 
   // Getters
   getTotalValueUsd: () => Decimal;
-  getWalletsByChain: (chain: Chain) => WalletWithBalances[];
+  getWalletsByType: (type: WalletType) => WalletWithBalances[];
+}
+
+// Helper to detect wallet type from address
+function detectWalletType(address: string): WalletType {
+  if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return 'EVM';
+  }
+  return 'SOLANA';
+}
+
+// Get chains to query based on wallet type
+function getChainsForWalletType(walletType: WalletType): Chain[] {
+  if (walletType === 'EVM') {
+    return getEVMChains().map(c => c.id);
+  }
+  return [Chain.SOLANA];
 }
 
 export const useWalletsStore = create<WalletsState>((set, get) => ({
   wallets: [],
   isLoading: false,
   error: null,
-  showUnknownTokens: false, // Default: only show registered tokens
+  showUnknownTokens: false,
 
   loadWallets: async () => {
     set({ isLoading: true, error: null });
@@ -59,11 +86,10 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
       const walletsWithBalances: WalletWithBalances[] = storedWallets.map((w) => ({
         id: w.id,
         address: w.address,
-        chain: w.chain as Chain,
+        walletType: (w.chain === 'EVM' || w.chain === 'SOLANA' ? w.chain : 'EVM') as WalletType,
         label: w.label || w.address.slice(0, 6) + '...' + w.address.slice(-4),
         createdAt: w.createdAt ? new Date(w.createdAt as unknown as number) : new Date(),
-        nativeBalance: null,
-        tokenBalances: [],
+        chainBalances: [],
         totalValueUsd: new Decimal(0),
         isLoading: false,
         lastSync: null,
@@ -84,19 +110,25 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
     }
   },
 
-  addWallet: async (address, chain, label) => {
+  addWallet: async (address, label) => {
     const { wallets: currentWallets } = get();
     set({ isLoading: true, error: null });
 
     try {
+      // Detect wallet type from address format
+      const walletType = detectWalletType(address);
+
       // Validate address
-      if (!walletService.isValidAddress(address, chain)) {
-        throw new Error('Invalid wallet address');
+      if (walletType === 'EVM' && !walletService.isValidEVMAddress(address)) {
+        throw new Error('Invalid EVM wallet address');
+      }
+      if (walletType === 'SOLANA' && !walletService.isValidSolanaAddress(address)) {
+        throw new Error('Invalid Solana wallet address');
       }
 
-      // Check if already exists
+      // Check if already exists (same address)
       const existing = currentWallets.find(
-        (w) => w.address.toLowerCase() === address.toLowerCase() && w.chain === chain
+        (w) => w.address.toLowerCase() === address.toLowerCase()
       );
       if (existing) {
         throw new Error('Wallet already exists');
@@ -110,7 +142,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
       await db.insert(wallets).values({
         id,
         address: address.toLowerCase(),
-        chain,
+        chain: walletType, // Store wallet type in chain field
         label: label || undefined,
         createdAt: now,
       });
@@ -118,11 +150,10 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
       const newWallet: WalletWithBalances = {
         id,
         address: address.toLowerCase(),
-        chain,
+        walletType,
         label: label || address.slice(0, 6) + '...' + address.slice(-4),
         createdAt: now,
-        nativeBalance: null,
-        tokenBalances: [],
+        chainBalances: [],
         totalValueUsd: new Decimal(0),
         isLoading: true,
         lastSync: null,
@@ -176,7 +207,6 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
 
   setShowUnknownTokens: (show) => {
     set({ showUnknownTokens: show });
-    // Re-sync all wallets with new filter setting
     get().syncAllWallets();
   },
 
@@ -196,19 +226,33 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
     });
 
     try {
-      // Fetch wallet summary from blockchain service
-      // If showUnknownTokens is false, filter out unregistered tokens
+      // Get chains to query based on wallet type
+      const chains = getChainsForWalletType(wallet.walletType);
+
+      // Fetch wallet summary for all relevant chains
       const summary = await walletService.getWalletSummary(wallet.address, {
-        chains: [wallet.chain],
-        useCommonTokensOnly: false, // Fetch all tokens, then filter
-        filterUnknownTokens: !showUnknownTokens, // Filter if NOT showing unknown
+        chains,
+        useCommonTokensOnly: false,
+        filterUnknownTokens: !showUnknownTokens,
       });
 
-      const chainData = summary.chains.find((c) => c.chain === wallet.chain);
+      // Convert to chainBalances format
+      const chainBalances: ChainBalance[] = summary.chains
+        .filter(c =>
+          c.nativeBalance.balance.greaterThan(0) ||
+          c.tokenBalances.length > 0
+        )
+        .map(c => ({
+          chain: c.chain,
+          nativeBalance: c.nativeBalance,
+          tokenBalances: c.tokenBalances,
+          totalValueUsd: calculateChainValue(c),
+        }));
 
-      if (!chainData) {
-        throw new Error('Failed to fetch chain data');
-      }
+      const totalValueUsd = chainBalances.reduce(
+        (sum, cb) => sum.plus(cb.totalValueUsd),
+        new Decimal(0)
+      );
 
       // Update state
       set({
@@ -216,9 +260,8 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
           w.id === walletId
             ? {
                 ...w,
-                nativeBalance: chainData.nativeBalance,
-                tokenBalances: chainData.tokenBalances,
-                totalValueUsd: calculateWalletValue(chainData),
+                chainBalances,
+                totalValueUsd,
                 isLoading: false,
                 lastSync: new Date(),
               }
@@ -230,29 +273,31 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
       const db = getDb();
       await db.delete(onchainAssets).where(eq(onchainAssets.walletId, walletId));
 
-      // Store native balance
-      if (chainData.nativeBalance && chainData.nativeBalance.balance.greaterThan(0)) {
-        await db.insert(onchainAssets).values({
-          id: generateId(),
-          walletId,
-          tokenSymbol: chainData.nativeBalance.symbol,
-          balance: chainData.nativeBalance.balance.toNumber(),
-          decimals: 18,
-          updatedAt: new Date(),
-        });
-      }
+      for (const chainBalance of chainBalances) {
+        // Store native balance
+        if (chainBalance.nativeBalance && chainBalance.nativeBalance.balance.greaterThan(0)) {
+          await db.insert(onchainAssets).values({
+            id: generateId(),
+            walletId,
+            tokenSymbol: `${chainBalance.nativeBalance.symbol}:${chainBalance.chain}`,
+            balance: chainBalance.nativeBalance.balance.toNumber(),
+            decimals: 18,
+            updatedAt: new Date(),
+          });
+        }
 
-      // Store token balances
-      for (const token of chainData.tokenBalances) {
-        await db.insert(onchainAssets).values({
-          id: generateId(),
-          walletId,
-          contractAddress: token.token.address,
-          tokenSymbol: token.token.symbol,
-          balance: token.balance.toNumber(),
-          decimals: token.token.decimals,
-          updatedAt: new Date(),
-        });
+        // Store token balances
+        for (const token of chainBalance.tokenBalances) {
+          await db.insert(onchainAssets).values({
+            id: generateId(),
+            walletId,
+            contractAddress: `${token.token.address}:${chainBalance.chain}`,
+            tokenSymbol: token.token.symbol,
+            balance: token.balance.toNumber(),
+            decimals: token.token.decimals,
+            updatedAt: new Date(),
+          });
+        }
       }
     } catch (error) {
       console.error(`Failed to sync wallet ${walletId}:`, error);
@@ -284,13 +329,13 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
     return currentWallets.reduce((sum, w) => sum.plus(w.totalValueUsd), new Decimal(0));
   },
 
-  getWalletsByChain: (chain) => {
+  getWalletsByType: (type) => {
     const { wallets: currentWallets } = get();
-    return currentWallets.filter((w) => w.chain === chain);
+    return currentWallets.filter((w) => w.walletType === type);
   },
 }));
 
-function calculateWalletValue(chainData: WalletSummary['chains'][0]): Decimal {
+function calculateChainValue(chainData: WalletSummary['chains'][0]): Decimal {
   let total = chainData.nativeBalance.valueUsd || new Decimal(0);
 
   for (const token of chainData.tokenBalances) {
