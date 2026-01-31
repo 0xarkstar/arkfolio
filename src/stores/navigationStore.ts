@@ -6,6 +6,8 @@ export type ViewId =
   | 'exchanges'
   | 'wallets'
   | 'defi'
+  | 'nft'
+  | 'rebalance'
   | 'risk'
   | 'tax'
   | 'history'

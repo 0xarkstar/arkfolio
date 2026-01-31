@@ -195,6 +195,16 @@ export const notifications = sqliteTable('notifications', {
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// Target Allocations for Rebalancing
+export const targetAllocations = sqliteTable('target_allocations', {
+  id: text('id').primaryKey(),
+  asset: text('asset').notNull(),
+  targetPercent: real('target_percent').notNull(), // 0-100
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
 // Relations
 export const exchangesRelations = relations(exchanges, ({ many }) => ({
   balances: many(balances),
@@ -266,3 +276,5 @@ export type LiquidationAlert = typeof liquidationAlerts.$inferSelect;
 export type NewLiquidationAlert = typeof liquidationAlerts.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
+export type TargetAllocation = typeof targetAllocations.$inferSelect;
+export type NewTargetAllocation = typeof targetAllocations.$inferInsert;

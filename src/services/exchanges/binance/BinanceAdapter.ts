@@ -15,6 +15,8 @@ import {
   TransferHistoryParams,
   SupportedExchange,
 } from '../types';
+import { logger } from '../../../utils/logger';
+import { HttpError, HttpErrorType } from '../../utils/httpUtils';
 
 // Binance API response types
 interface BinanceSpotBalance {
@@ -171,7 +173,8 @@ export class BinanceAdapter extends BaseExchangeAdapter {
       await this.signedRequest('GET', '/api/v3/account', {}, this.spotClient);
       return true;
     } catch (error) {
-      console.error('Binance connection test failed:', error);
+      const httpError = HttpError.fromError(error, HttpErrorType.AUTH);
+      logger.error('Binance connection test failed:', httpError.getUserFriendlyMessage());
       return false;
     }
   }
@@ -329,7 +332,8 @@ export class BinanceAdapter extends BaseExchangeAdapter {
         }))
       );
     } catch (error) {
-      console.warn('Failed to fetch flexible earn positions:', error);
+      const httpError = HttpError.fromError(error);
+      logger.warn('Failed to fetch flexible earn positions:', httpError.getUserFriendlyMessage());
     }
 
     // Locked savings
@@ -360,7 +364,8 @@ export class BinanceAdapter extends BaseExchangeAdapter {
         }))
       );
     } catch (error) {
-      console.warn('Failed to fetch locked earn positions:', error);
+      const httpError = HttpError.fromError(error);
+      logger.warn('Failed to fetch locked earn positions:', httpError.getUserFriendlyMessage());
     }
 
     return positions;
@@ -463,7 +468,7 @@ export class BinanceAdapter extends BaseExchangeAdapter {
       this.ws = new WebSocket(`wss://stream.binance.com:9443/ws/${this.wsListenKey}`);
 
       this.ws.onopen = () => {
-        console.log('Binance WebSocket connected');
+        logger.debug('Binance WebSocket connected');
       };
 
       this.ws.onmessage = (event) => {
@@ -471,11 +476,11 @@ export class BinanceAdapter extends BaseExchangeAdapter {
       };
 
       this.ws.onerror = (error) => {
-        console.error('Binance WebSocket error:', error);
+        logger.error('Binance WebSocket error:', error);
       };
 
       this.ws.onclose = () => {
-        console.log('Binance WebSocket disconnected');
+        logger.debug('Binance WebSocket disconnected');
         this.ws = null;
       };
 
@@ -484,7 +489,8 @@ export class BinanceAdapter extends BaseExchangeAdapter {
         this.keepAliveListenKey();
       }, 30 * 60 * 1000);
     } catch (error) {
-      console.error('Failed to connect Binance WebSocket:', error);
+      const httpError = HttpError.fromError(error, HttpErrorType.NETWORK);
+      logger.error('Failed to connect Binance WebSocket:', httpError.getUserFriendlyMessage());
     }
   }
 
@@ -511,7 +517,8 @@ export class BinanceAdapter extends BaseExchangeAdapter {
         headers: { 'X-MBX-APIKEY': this.credentials.apiKey },
       });
     } catch (error) {
-      console.error('Failed to keep alive listen key:', error);
+      const httpError = HttpError.fromError(error);
+      logger.error('Failed to keep alive listen key:', httpError.getUserFriendlyMessage());
     }
   }
 

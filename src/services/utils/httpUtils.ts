@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
+import { logger } from '../../utils/logger';
 
 /**
  * Error types for classification
@@ -29,22 +30,26 @@ const USER_FRIENDLY_MESSAGES: Record<HttpErrorType, string> = {
 /**
  * Structured HTTP error with classification
  */
+export interface ErrorOptions {
+  statusCode?: number;
+  retryable?: boolean;
+  retryAfter?: number;
+  originalError?: Error;
+  userMessage?: string;
+}
+
 export class HttpError extends Error {
   readonly type: HttpErrorType;
   readonly statusCode?: number;
   readonly retryable: boolean;
   readonly retryAfter?: number; // seconds
   readonly originalError?: Error;
+  readonly userMessage?: string;
 
   constructor(
     message: string,
     type: HttpErrorType,
-    options?: {
-      statusCode?: number;
-      retryable?: boolean;
-      retryAfter?: number;
-      originalError?: Error;
-    }
+    options?: ErrorOptions
   ) {
     super(message);
     this.name = 'HttpError';
@@ -53,13 +58,30 @@ export class HttpError extends Error {
     this.retryable = options?.retryable ?? false;
     this.retryAfter = options?.retryAfter;
     this.originalError = options?.originalError;
+    this.userMessage = options?.userMessage;
   }
 
   /**
    * Get a user-friendly error message suitable for UI display
    */
   getUserFriendlyMessage(): string {
-    return USER_FRIENDLY_MESSAGES[this.type] || USER_FRIENDLY_MESSAGES[HttpErrorType.UNKNOWN];
+    return this.userMessage || USER_FRIENDLY_MESSAGES[this.type] || USER_FRIENDLY_MESSAGES[HttpErrorType.UNKNOWN];
+  }
+
+  /**
+   * Create an HttpError from any error
+   */
+  static fromError(error: unknown, type = HttpErrorType.UNKNOWN): HttpError {
+    if (error instanceof HttpError) {
+      return error;
+    }
+    if (error instanceof AxiosError) {
+      return HttpError.fromAxiosError(error);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return new HttpError(message, type, {
+      originalError: error instanceof Error ? error : undefined,
+    });
   }
 
   static fromAxiosError(error: AxiosError): HttpError {
@@ -254,7 +276,7 @@ export async function httpWithRetry<T>(
         httpError.retryAfter
       );
 
-      console.log(
+      logger.debug(
         `[httpWithRetry] Attempt ${attempt + 1}/${retryConfig.maxRetries + 1} failed: ${httpError.type}. ` +
         `Retrying in ${Math.round(delay / 1000)}s...`
       );
@@ -374,4 +396,189 @@ export function createHttpClient(
   };
 
   return { client, request, get, post };
+}
+
+/**
+ * Blockchain-specific error types
+ */
+export enum BlockchainErrorType {
+  INVALID_ADDRESS = 'invalid_address',
+  INSUFFICIENT_BALANCE = 'insufficient_balance',
+  CONTRACT_ERROR = 'contract_error',
+  RPC_ERROR = 'rpc_error',
+  CHAIN_NOT_SUPPORTED = 'chain_not_supported',
+  WALLET_NOT_CONNECTED = 'wallet_not_connected',
+  TRANSACTION_FAILED = 'transaction_failed',
+  SIGNATURE_REJECTED = 'signature_rejected',
+}
+
+/**
+ * User-friendly messages for blockchain errors
+ */
+const BLOCKCHAIN_USER_MESSAGES: Record<BlockchainErrorType, string> = {
+  [BlockchainErrorType.INVALID_ADDRESS]: 'The wallet address is invalid. Please check and try again.',
+  [BlockchainErrorType.INSUFFICIENT_BALANCE]: 'Insufficient balance for this operation.',
+  [BlockchainErrorType.CONTRACT_ERROR]: 'Smart contract execution failed. Please try again.',
+  [BlockchainErrorType.RPC_ERROR]: 'Blockchain connection error. Please try again later.',
+  [BlockchainErrorType.CHAIN_NOT_SUPPORTED]: 'This blockchain network is not supported.',
+  [BlockchainErrorType.WALLET_NOT_CONNECTED]: 'Please connect your wallet to continue.',
+  [BlockchainErrorType.TRANSACTION_FAILED]: 'Transaction failed. Please check your balance and try again.',
+  [BlockchainErrorType.SIGNATURE_REJECTED]: 'Transaction signature was rejected.',
+};
+
+/**
+ * Blockchain-specific error class
+ */
+export class BlockchainError extends Error {
+  readonly type: BlockchainErrorType;
+  readonly chain?: string;
+  readonly address?: string;
+  readonly txHash?: string;
+  readonly originalError?: Error;
+
+  constructor(
+    message: string,
+    type: BlockchainErrorType,
+    options?: {
+      chain?: string;
+      address?: string;
+      txHash?: string;
+      originalError?: Error;
+    }
+  ) {
+    super(message);
+    this.name = 'BlockchainError';
+    this.type = type;
+    this.chain = options?.chain;
+    this.address = options?.address;
+    this.txHash = options?.txHash;
+    this.originalError = options?.originalError;
+  }
+
+  getUserFriendlyMessage(): string {
+    return BLOCKCHAIN_USER_MESSAGES[this.type] || 'A blockchain error occurred. Please try again.';
+  }
+
+  static fromError(error: unknown, type = BlockchainErrorType.RPC_ERROR, options?: { chain?: string; address?: string }): BlockchainError {
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Detect error type from message
+    const msgLower = message.toLowerCase();
+    let detectedType = type;
+
+    if (msgLower.includes('invalid address') || msgLower.includes('bad address')) {
+      detectedType = BlockchainErrorType.INVALID_ADDRESS;
+    } else if (msgLower.includes('insufficient') || msgLower.includes('not enough')) {
+      detectedType = BlockchainErrorType.INSUFFICIENT_BALANCE;
+    } else if (msgLower.includes('user rejected') || msgLower.includes('user denied')) {
+      detectedType = BlockchainErrorType.SIGNATURE_REJECTED;
+    } else if (msgLower.includes('execution reverted') || msgLower.includes('revert')) {
+      detectedType = BlockchainErrorType.CONTRACT_ERROR;
+    }
+
+    return new BlockchainError(message, detectedType, {
+      ...options,
+      originalError: error instanceof Error ? error : undefined,
+    });
+  }
+}
+
+/**
+ * DeFi-specific error types
+ */
+export enum DefiErrorType {
+  POSITION_NOT_FOUND = 'position_not_found',
+  PROTOCOL_ERROR = 'protocol_error',
+  PRICE_UNAVAILABLE = 'price_unavailable',
+  SLIPPAGE_TOO_HIGH = 'slippage_too_high',
+  LIQUIDITY_INSUFFICIENT = 'liquidity_insufficient',
+  API_KEY_MISSING = 'api_key_missing',
+  SYNC_FAILED = 'sync_failed',
+  CALCULATION_ERROR = 'calculation_error',
+}
+
+/**
+ * User-friendly messages for DeFi errors
+ */
+const DEFI_USER_MESSAGES: Record<DefiErrorType, string> = {
+  [DefiErrorType.POSITION_NOT_FOUND]: 'The requested position was not found.',
+  [DefiErrorType.PROTOCOL_ERROR]: 'Error communicating with the DeFi protocol.',
+  [DefiErrorType.PRICE_UNAVAILABLE]: 'Unable to fetch current prices. Please try again.',
+  [DefiErrorType.SLIPPAGE_TOO_HIGH]: 'Price slippage is too high. Consider adjusting your transaction.',
+  [DefiErrorType.LIQUIDITY_INSUFFICIENT]: 'Insufficient liquidity for this operation.',
+  [DefiErrorType.API_KEY_MISSING]: 'API key not configured. Please set up your API key in Settings.',
+  [DefiErrorType.SYNC_FAILED]: 'Failed to sync DeFi positions. Please try again.',
+  [DefiErrorType.CALCULATION_ERROR]: 'Error calculating position values.',
+};
+
+/**
+ * DeFi-specific error class
+ */
+export class DefiError extends Error {
+  readonly type: DefiErrorType;
+  readonly protocol?: string;
+  readonly positionId?: string;
+  readonly originalError?: Error;
+
+  constructor(
+    message: string,
+    type: DefiErrorType,
+    options?: {
+      protocol?: string;
+      positionId?: string;
+      originalError?: Error;
+    }
+  ) {
+    super(message);
+    this.name = 'DefiError';
+    this.type = type;
+    this.protocol = options?.protocol;
+    this.positionId = options?.positionId;
+    this.originalError = options?.originalError;
+  }
+
+  getUserFriendlyMessage(): string {
+    return DEFI_USER_MESSAGES[this.type] || 'A DeFi error occurred. Please try again.';
+  }
+
+  static fromError(error: unknown, type = DefiErrorType.PROTOCOL_ERROR, options?: { protocol?: string; positionId?: string }): DefiError {
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Detect error type from message
+    const msgLower = message.toLowerCase();
+    let detectedType = type;
+
+    if (msgLower.includes('not found') || msgLower.includes('no position')) {
+      detectedType = DefiErrorType.POSITION_NOT_FOUND;
+    } else if (msgLower.includes('api key') || msgLower.includes('not configured')) {
+      detectedType = DefiErrorType.API_KEY_MISSING;
+    } else if (msgLower.includes('price') || msgLower.includes('coingecko')) {
+      detectedType = DefiErrorType.PRICE_UNAVAILABLE;
+    } else if (msgLower.includes('slippage')) {
+      detectedType = DefiErrorType.SLIPPAGE_TOO_HIGH;
+    } else if (msgLower.includes('liquidity')) {
+      detectedType = DefiErrorType.LIQUIDITY_INSUFFICIENT;
+    }
+
+    return new DefiError(message, detectedType, {
+      ...options,
+      originalError: error instanceof Error ? error : undefined,
+    });
+  }
+}
+
+/**
+ * Get user-friendly error message from any error
+ */
+export function getUserFriendlyError(error: unknown): string {
+  if (error instanceof HttpError) {
+    return error.getUserFriendlyMessage();
+  }
+  if (error instanceof BlockchainError) {
+    return error.getUserFriendlyMessage();
+  }
+  if (error instanceof DefiError) {
+    return error.getUserFriendlyMessage();
+  }
+  return getErrorMessage(error);
 }

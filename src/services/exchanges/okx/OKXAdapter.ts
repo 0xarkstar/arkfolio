@@ -15,6 +15,8 @@ import {
   TransferHistoryParams,
   SupportedExchange,
 } from '../types';
+import { logger } from '../../../utils/logger';
+import { HttpError, HttpErrorType } from '../../utils/httpUtils';
 
 // OKX API response types
 interface OKXResponse<T> {
@@ -168,7 +170,8 @@ export class OKXAdapter extends BaseExchangeAdapter {
       await this.signedRequest('GET', '/api/v5/account/balance');
       return true;
     } catch (error) {
-      console.error('OKX connection test failed:', error);
+      const httpError = HttpError.fromError(error, HttpErrorType.AUTH);
+      logger.error('OKX connection test failed:', httpError.getUserFriendlyMessage());
       return false;
     }
   }
@@ -325,7 +328,8 @@ export class OKXAdapter extends BaseExchangeAdapter {
         } as EarnPosition;
       });
     } catch (error) {
-      console.warn('Failed to fetch OKX earn positions:', error);
+      const httpError = HttpError.fromError(error);
+      logger.warn('Failed to fetch OKX earn positions:', httpError.getUserFriendlyMessage());
       return [];
     }
   }
@@ -415,7 +419,8 @@ export class OKXAdapter extends BaseExchangeAdapter {
           });
         }
       } catch (error) {
-        console.warn(`Failed to fetch funding rate for ${symbol}:`, error);
+        const httpError = HttpError.fromError(error);
+        logger.warn(`Failed to fetch funding rate for ${symbol}:`, httpError.getUserFriendlyMessage());
       }
     }
 
@@ -428,7 +433,7 @@ export class OKXAdapter extends BaseExchangeAdapter {
     this.ws = new WebSocket(this.WS_URL);
 
     this.ws.onopen = () => {
-      console.log('OKX WebSocket connected');
+      logger.debug('OKX WebSocket connected');
       this.authenticateWebSocket();
     };
 
@@ -437,11 +442,11 @@ export class OKXAdapter extends BaseExchangeAdapter {
     };
 
     this.ws.onerror = (error) => {
-      console.error('OKX WebSocket error:', error);
+      logger.error('OKX WebSocket error:', error);
     };
 
     this.ws.onclose = () => {
-      console.log('OKX WebSocket disconnected');
+      logger.debug('OKX WebSocket disconnected');
       this.ws = null;
     };
   }
@@ -484,7 +489,7 @@ export class OKXAdapter extends BaseExchangeAdapter {
 
   private handleWebSocketMessage(data: any): void {
     if (data.event === 'login' && data.code === '0') {
-      console.log('OKX WebSocket authenticated');
+      logger.debug('OKX WebSocket authenticated');
       this.subscribeToChannels();
       return;
     }

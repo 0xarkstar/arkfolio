@@ -12,6 +12,7 @@ import { Alert } from '../../components/Alert';
 import { SkeletonCard } from '../../components/Skeleton';
 import { zapperService } from '../../services/defi';
 import { availableLanguages, changeLanguage } from '../../i18n';
+import { ApiKeyManager } from './components';
 import {
   settings as settingsTable,
   exchanges as exchangesTable,
@@ -524,6 +525,11 @@ export function SettingsPage() {
             )}
           </div>
         </div>
+      </Card>
+
+      {/* Exchange API Key Management */}
+      <Card className="p-6">
+        <ApiKeyManager />
       </Card>
 
       {/* Backup & Security */}

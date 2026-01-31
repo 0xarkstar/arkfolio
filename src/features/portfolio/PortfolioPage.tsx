@@ -3,6 +3,7 @@ import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { useWalletsStore } from '../../stores/walletsStore';
 import { useDefiStore } from '../../stores/defiStore';
+import { excelExportService } from '../../services/export';
 import { PortfolioChart, AssetAllocationChart, CategoryAllocationChart, PerformanceStats } from '../../components/charts';
 import { toast } from '../../components/Toast';
 import { Card } from '../../components/Card';
@@ -118,6 +119,33 @@ export function PortfolioPage() {
     toast.success('Portfolio exported to CSV');
   };
 
+  const handleExportExcel = () => {
+    if (holdings.length === 0) {
+      toast.error('No holdings to export');
+      return;
+    }
+
+    excelExportService.exportPortfolio({
+      holdings: holdings.map((h) => ({
+        symbol: h.symbol,
+        name: h.name,
+        amount: h.totalAmount,
+        priceUsd: h.priceUsd,
+        valueUsd: h.valueUsd,
+        allocation: summary.totalValueUsd.greaterThan(0)
+          ? h.valueUsd.div(summary.totalValueUsd).times(100).toNumber()
+          : 0,
+        change24h: h.change24h,
+      })),
+      summary: {
+        totalValueUsd: summary.totalValueUsd,
+        assetCount: summary.totalAssets,
+      },
+    });
+
+    toast.success('Portfolio exported to Excel');
+  };
+
   return (
     <div className="space-y-6">
       {/* Portfolio Summary */}
@@ -160,13 +188,22 @@ export function PortfolioPage() {
                       Refresh
                     </Button>
                     {hasData && (
-                      <Button
-                        onClick={handleExportCSV}
-                        variant="ghost"
-                        size="xs"
-                      >
-                        Export CSV
-                      </Button>
+                      <>
+                        <Button
+                          onClick={handleExportCSV}
+                          variant="ghost"
+                          size="xs"
+                        >
+                          Export CSV
+                        </Button>
+                        <Button
+                          onClick={handleExportExcel}
+                          variant="ghost"
+                          size="xs"
+                        >
+                          Export Excel
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>

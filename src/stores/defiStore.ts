@@ -4,6 +4,7 @@ import { getDb, generateId } from '../database/init';
 import { defiPositions, points, wallets } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { zapperService, costBasisService } from '../services/defi';
+import { logger } from '../utils/logger';
 
 export interface DefiPosition {
   id: string;
@@ -118,7 +119,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
 
       set({ positions: loadedPositions, isLoading: false });
     } catch (error) {
-      console.error('Failed to load DeFi positions:', error);
+      logger.error('Failed to load DeFi positions:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load positions',
         isLoading: false,
@@ -142,7 +143,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
 
       set({ pointsBalances: loadedPoints });
     } catch (error) {
-      console.error('Failed to load points:', error);
+      logger.error('Failed to load points:', error);
     }
   },
 
@@ -357,7 +358,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
         lastZapperSync: new Date(),
       });
     } catch (error) {
-      console.error('Failed to sync from Zapper:', error);
+      logger.error('Failed to sync from Zapper:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to sync DeFi positions',
         isSyncing: false,
@@ -406,7 +407,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
     const position = positions.find((p) => p.id === positionId);
 
     if (!position) {
-      console.warn(`Position ${positionId} not found`);
+      logger.warn(`Position ${positionId} not found`);
       return;
     }
 
@@ -422,7 +423,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
         });
       }
     } catch (error) {
-      console.error(`Failed to calculate cost basis for position ${positionId}:`, error);
+      logger.error(`Failed to calculate cost basis for position ${positionId}:`, error);
     } finally {
       set({ isCalculatingCostBasis: false });
     }
@@ -431,9 +432,9 @@ export const useDefiStore = create<DefiState>((set, get) => ({
   calculateAllCostBasis: async (walletAddress: string) => {
     const { positions, updatePosition } = get();
 
-    console.log(`\n========== STARTING COST BASIS CALCULATION ==========`);
-    console.log(`Wallet: ${walletAddress}`);
-    console.log(`Positions to process: ${positions.length}`);
+    logger.debug('========== STARTING COST BASIS CALCULATION ==========');
+    logger.debug(`Wallet: ${walletAddress}`);
+    logger.debug(`Positions to process: ${positions.length}`);
 
     set({ isCalculatingCostBasis: true });
 
@@ -443,31 +444,31 @@ export const useDefiStore = create<DefiState>((set, get) => ({
         positions,
         walletAddress,
         (completed, total) => {
-          console.log(`Progress: ${completed}/${total} positions processed`);
+          logger.debug(`Progress: ${completed}/${total} positions processed`);
         },
         // Real-time update callback - updates UI immediately when each position is calculated
         async (positionId, costBasis) => {
-          console.log(`\n>>> CALLBACK: Position ${positionId}`);
-          console.log(`    Cost basis: $${costBasis.totalCostBasisUsd.toFixed(2)}`);
-          console.log(`    Entry date: ${costBasis.firstEntryDate?.toLocaleDateString() || 'N/A'}`);
+          logger.debug(`>>> CALLBACK: Position ${positionId}`);
+          logger.debug(`    Cost basis: $${costBasis.totalCostBasisUsd.toFixed(2)}`);
+          logger.debug(`    Entry date: ${costBasis.firstEntryDate?.toLocaleDateString() || 'N/A'}`);
 
           if (costBasis.totalCostBasisUsd.greaterThan(0)) {
-            console.log(`    -> Updating position in store...`);
+            logger.debug(`    -> Updating position in store...`);
             await updatePosition(positionId, {
               costBasisUsd: costBasis.totalCostBasisUsd,
               entryDate: costBasis.firstEntryDate,
             });
-            console.log(`    -> Position updated!`);
+            logger.debug(`    -> Position updated!`);
           } else {
-            console.log(`    -> Skipped (cost basis is 0)`);
+            logger.debug(`    -> Skipped (cost basis is 0)`);
           }
         }
       );
     } catch (error) {
-      console.error('Failed to calculate cost basis:', error);
+      logger.error('Failed to calculate cost basis:', error);
     } finally {
       set({ isCalculatingCostBasis: false });
-      console.log(`\n========== COST BASIS CALCULATION COMPLETE ==========\n`);
+      logger.debug('========== COST BASIS CALCULATION COMPLETE ==========');
     }
   },
 

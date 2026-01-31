@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import Decimal from 'decimal.js';
 import { priceService, PriceData } from '../services/price';
 import { useExchangeStore } from './exchangeStore';
+import { logger } from '../utils/logger';
 
 export interface AssetHolding {
   symbol: string;
@@ -133,7 +134,7 @@ export const usePortfolioStore = create<PortfolioState>((set) => ({
       const prices = await priceService.getPrices(symbols);
       set({ prices });
     } catch (error) {
-      console.error('Failed to refresh prices:', error);
+      logger.error('Failed to refresh prices:', error);
     }
   },
 
@@ -296,7 +297,7 @@ export const usePortfolioStore = create<PortfolioState>((set) => ({
         lastRefresh: new Date(),
       });
     } catch (error) {
-      console.error('Failed to refresh portfolio:', error);
+      logger.error('Failed to refresh portfolio:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to refresh portfolio',
         isLoading: false,

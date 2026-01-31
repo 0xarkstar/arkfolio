@@ -19,6 +19,8 @@ const ExchangesPage = lazy(() => import('./features/cex').then(m => ({ default: 
 const PortfolioPage = lazy(() => import('./features/portfolio').then(m => ({ default: m.PortfolioPage })));
 const WalletsPage = lazy(() => import('./features/onchain').then(m => ({ default: m.WalletsPage })));
 const DefiPage = lazy(() => import('./features/defi').then(m => ({ default: m.DefiPage })));
+const NftPage = lazy(() => import('./features/nft').then(m => ({ default: m.NftPage })));
+const RebalancePage = lazy(() => import('./features/rebalance').then(m => ({ default: m.RebalancePage })));
 const RiskPage = lazy(() => import('./features/risk').then(m => ({ default: m.RiskPage })));
 const TaxPage = lazy(() => import('./features/tax').then(m => ({ default: m.TaxPage })));
 const SettingsPage = lazy(() => import('./features/settings').then(m => ({ default: m.SettingsPage })));
@@ -132,6 +134,10 @@ function PageRouter({ currentView }: { currentView: ViewId }) {
             return <WalletsPage />;
           case 'defi':
             return <DefiPage />;
+          case 'nft':
+            return <NftPage />;
+          case 'rebalance':
+            return <RebalancePage />;
           case 'risk':
             return <RiskPage />;
           case 'tax':
