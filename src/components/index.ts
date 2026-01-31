@@ -48,6 +48,8 @@ export {
 } from './Input';
 export { Button, IconButton, ButtonGroup } from './Button';
 export { DataTable, SimpleTable } from './DataTable';
+export { VirtualizedTable } from './VirtualizedTable';
+export type { VirtualizedTableColumn } from './VirtualizedTable';
 export { Alert, Banner, InlineAlert } from './Alert';
 export { SearchInput, FilterBar, CommandSearch } from './SearchInput';
 export { Pagination, SimplePagination, LoadMore, usePagination } from './Pagination';

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useRef, useEffect, ReactNode, useCallback } from 'react';
 
 interface DropdownItem {
   id: string;
@@ -15,6 +15,8 @@ interface DropdownProps {
   onSelect: (id: string) => void;
   align?: 'left' | 'right';
   className?: string;
+  /** Accessible label for the dropdown menu */
+  'aria-label'?: string;
 }
 
 export function Dropdown({
@@ -23,15 +25,24 @@ export function Dropdown({
   onSelect,
   align = 'left',
   className = '',
+  'aria-label': ariaLabel = 'Menu',
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerId = useRef(`dropdown-trigger-${Math.random().toString(36).slice(2)}`);
+  const menuId = useRef(`dropdown-menu-${Math.random().toString(36).slice(2)}`);
+
+  // Get focusable items (excluding dividers and disabled)
+  const focusableItems = items.filter(item => !item.divider && !item.disabled);
 
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setFocusedIndex(-1);
       }
     };
 
@@ -44,37 +55,98 @@ export function Dropdown({
     };
   }, [isOpen]);
 
-  // Close on ESC
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setIsOpen(true);
+        setFocusedIndex(0);
       }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
+      return;
     }
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen]);
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const next = prev + 1;
+          return next >= focusableItems.length ? 0 : next;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const next = prev - 1;
+          return next < 0 ? focusableItems.length - 1 : next;
+        });
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < focusableItems.length) {
+          const item = focusableItems[focusedIndex];
+          onSelect(item.id);
+          setIsOpen(false);
+          setFocusedIndex(-1);
+        }
+        break;
+      case 'Tab':
+        setIsOpen(false);
+        setFocusedIndex(-1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        setFocusedIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setFocusedIndex(focusableItems.length - 1);
+        break;
+    }
+  }, [isOpen, focusableItems, focusedIndex, onSelect]);
 
   const handleSelect = (item: DropdownItem) => {
     if (item.disabled || item.divider) return;
     onSelect(item.id);
     setIsOpen(false);
+    setFocusedIndex(-1);
+  };
+
+  const handleTriggerClick = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setFocusedIndex(0);
+    }
   };
 
   return (
-    <div ref={dropdownRef} className={`relative inline-block ${className}`}>
-      <div onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
+    <div ref={dropdownRef} className={`relative inline-block ${className}`} onKeyDown={handleKeyDown}>
+      <div
+        id={triggerId.current}
+        onClick={handleTriggerClick}
+        className="cursor-pointer"
+        role="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? menuId.current : undefined}
+        tabIndex={0}
+      >
         {trigger}
       </div>
 
       {isOpen && (
         <div
+          ref={menuRef}
+          id={menuId.current}
+          role="menu"
+          aria-label={ariaLabel}
+          aria-labelledby={triggerId.current}
           className={`absolute z-50 mt-1 min-w-[160px] bg-surface-800 rounded-lg shadow-lg border border-surface-700 py-1 ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
@@ -84,27 +156,35 @@ export function Dropdown({
               return (
                 <div
                   key={`divider-${index}`}
+                  role="separator"
                   className="my-1 border-t border-surface-700"
                 />
               );
             }
 
+            const focusableIndex = focusableItems.findIndex(fi => fi.id === item.id);
+            const isFocused = focusableIndex === focusedIndex;
+
             return (
               <button
                 key={item.id}
+                role="menuitem"
                 onClick={() => handleSelect(item)}
                 disabled={item.disabled}
+                tabIndex={-1}
+                aria-disabled={item.disabled}
                 className={`
-                  w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors
+                  w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors min-h-[44px]
                   ${item.disabled
                     ? 'opacity-50 cursor-not-allowed text-surface-500'
                     : item.danger
                     ? 'text-loss hover:bg-loss/10'
                     : 'text-surface-300 hover:bg-surface-700 hover:text-surface-100'
                   }
+                  ${isFocused ? 'bg-surface-700 text-surface-100' : ''}
                 `}
               >
-                {item.icon && <span className="text-surface-500">{item.icon}</span>}
+                {item.icon && <span className="text-surface-500" aria-hidden="true">{item.icon}</span>}
                 {item.label}
               </button>
             );

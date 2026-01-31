@@ -39,15 +39,40 @@ export function Modal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, closeOnEsc, onClose]);
 
-  // Focus management
+  // Focus management with focus trap
   useEffect(() => {
-    if (isOpen && modalRef.current) {
-      const focusableElements = modalRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      const firstElement = focusableElements[0] as HTMLElement;
-      firstElement?.focus();
-    }
+    if (!isOpen || !modalRef.current) return;
+
+    const modal = modalRef.current;
+    const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const focusableElements = modal.querySelectorAll(focusableSelector);
+    const firstElement = focusableElements[0] as HTMLElement;
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    // Focus the first element
+    firstElement?.focus();
+
+    // Trap focus within modal
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    modal.addEventListener('keydown', handleTabKey);
+    return () => modal.removeEventListener('keydown', handleTabKey);
   }, [isOpen]);
 
   // Prevent body scroll when modal is open
@@ -110,10 +135,10 @@ export function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="text-surface-400 hover:text-surface-100 transition-colors text-2xl ml-auto"
-                aria-label="Close"
+                className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] text-surface-400 hover:text-surface-100 hover:bg-surface-800 rounded-lg transition-colors text-2xl ml-auto -mr-2 -mt-2"
+                aria-label="Close modal"
               >
-                &times;
+                <span aria-hidden="true">&times;</span>
               </button>
             )}
           </div>

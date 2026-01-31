@@ -2,11 +2,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
+    // Bundle analysis - generates stats.html when building
+    visualizer({
+      filename: 'dist/stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
     electron([
       {
         entry: 'electron/main.ts',
@@ -66,6 +74,9 @@ export default defineConfig({
           'vendor-charts': ['lightweight-charts'],
           'vendor-date': ['date-fns'],
           'vendor-decimal': ['decimal.js'],
+          'vendor-i18n': ['i18next', 'react-i18next'],
+          // CCXT is large - keep it separate for lazy loading
+          'vendor-ccxt': ['ccxt'],
           // Feature chunks are auto-split by lazy loading
         },
       },

@@ -46,7 +46,7 @@ export function DataTable<T extends Record<string, unknown>>({
   compact = false,
   striped = false,
   className = '',
-}: DataTableProps<T>) {
+}: DataTableProps<T>): JSX.Element {
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSortDirection);
 
@@ -99,7 +99,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="w-full">
+      <table className="w-full" role="table" aria-rowcount={data.length + 1}>
         <thead className={stickyHeader ? 'sticky top-0 bg-surface-900 z-10' : ''}>
           <tr className="border-b border-surface-800">
             {columns.map((column) => {
@@ -110,6 +110,9 @@ export function DataTable<T extends Record<string, unknown>>({
                 <th
                   key={column.key}
                   onClick={() => handleSort(column.key, isSortable)}
+                  scope="col"
+                  role="columnheader"
+                  aria-sort={isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
                   className={`
                     ${cellPadding} text-xs font-medium text-surface-400 uppercase tracking-wider
                     ${getAlignmentClass(column.align)}
@@ -165,6 +168,8 @@ export function DataTable<T extends Record<string, unknown>>({
               <tr
                 key={keyExtractor(item)}
                 onClick={() => onRowClick?.(item)}
+                role="row"
+                aria-rowindex={index + 2}
                 className={`
                   border-b border-surface-800/50 last:border-0
                   ${onRowClick ? 'cursor-pointer hover:bg-surface-800/50' : ''}
@@ -175,6 +180,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 {columns.map((column) => (
                   <td
                     key={column.key}
+                    role="cell"
                     className={`
                       ${cellPadding} text-sm text-surface-200
                       ${getAlignmentClass(column.align)}
