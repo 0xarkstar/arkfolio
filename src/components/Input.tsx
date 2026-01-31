@@ -17,14 +17,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const errorId = error ? `${inputId}-error` : undefined;
     const hintId = hint && !error ? `${inputId}-hint` : undefined;
     const getSizeStyles = () => {
+      // Note: Using min-h-[44px] for touch target compliance
+      // Using text-base (16px) on mobile to prevent iOS auto-zoom
       switch (size) {
         case 'sm':
-          return 'px-2.5 py-1.5 text-xs';
+          return 'px-2.5 py-1.5 text-sm min-h-[36px] sm:text-xs sm:min-h-0';
         case 'lg':
-          return 'px-4 py-3 text-base';
+          return 'px-4 py-3 text-base min-h-[48px]';
         case 'md':
         default:
-          return 'px-3 py-2 text-sm';
+          return 'px-3 py-2 text-base min-h-[44px] sm:text-sm sm:min-h-[40px]';
       }
     };
 
@@ -140,19 +142,21 @@ interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'typ
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
   ({ label, description, className = '', ...props }, ref) => {
     return (
-      <label className={`flex items-start gap-3 cursor-pointer ${className}`}>
-        <input
-          ref={ref}
-          type="checkbox"
-          className="
-            w-4 h-4 mt-0.5 rounded border-surface-600 bg-surface-800
-            text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0
-            disabled:opacity-50 disabled:cursor-not-allowed
-            cursor-pointer
-          "
-          {...props}
-        />
-        <div>
+      <label className={`flex items-start gap-3 cursor-pointer min-h-[44px] py-2 ${className}`}>
+        <div className="flex items-center justify-center w-6 h-6 -ml-1">
+          <input
+            ref={ref}
+            type="checkbox"
+            className="
+              w-5 h-5 rounded border-surface-600 bg-surface-800
+              text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0
+              disabled:opacity-50 disabled:cursor-not-allowed
+              cursor-pointer
+            "
+            {...props}
+          />
+        </div>
+        <div className="flex-1 pt-0.5">
           {label && <span className="text-sm text-surface-200">{label}</span>}
           {description && <p className="text-xs text-surface-500 mt-0.5">{description}</p>}
         </div>
@@ -172,19 +176,21 @@ interface RadioProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
 export const Radio = forwardRef<HTMLInputElement, RadioProps>(
   ({ label, description, className = '', ...props }, ref) => {
     return (
-      <label className={`flex items-start gap-3 cursor-pointer ${className}`}>
-        <input
-          ref={ref}
-          type="radio"
-          className="
-            w-4 h-4 mt-0.5 border-surface-600 bg-surface-800
-            text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0
-            disabled:opacity-50 disabled:cursor-not-allowed
-            cursor-pointer
-          "
-          {...props}
-        />
-        <div>
+      <label className={`flex items-start gap-3 cursor-pointer min-h-[44px] py-2 ${className}`}>
+        <div className="flex items-center justify-center w-6 h-6 -ml-1">
+          <input
+            ref={ref}
+            type="radio"
+            className="
+              w-5 h-5 border-surface-600 bg-surface-800
+              text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0
+              disabled:opacity-50 disabled:cursor-not-allowed
+              cursor-pointer
+            "
+            {...props}
+          />
+        </div>
+        <div className="flex-1 pt-0.5">
           {label && <span className="text-sm text-surface-200">{label}</span>}
           {description && <p className="text-xs text-surface-500 mt-0.5">{description}</p>}
         </div>
@@ -323,14 +329,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const hintId = hint && !error ? `${selectId}-hint` : undefined;
 
     const getSizeStyles = () => {
+      // Note: Using min-h-[44px] for touch target compliance
+      // Using text-base (16px) on mobile to prevent iOS auto-zoom
       switch (size) {
         case 'sm':
-          return 'px-2.5 py-1.5 text-xs';
+          return 'px-2.5 py-1.5 text-sm min-h-[36px] sm:text-xs sm:min-h-0';
         case 'lg':
-          return 'px-4 py-3 text-base';
+          return 'px-4 py-3 text-base min-h-[48px]';
         case 'md':
         default:
-          return 'px-3 py-2 text-sm';
+          return 'px-3 py-2 text-base min-h-[44px] sm:text-sm sm:min-h-[40px]';
       }
     };
 

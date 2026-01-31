@@ -201,4 +201,37 @@ app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(() => {
     return { action: 'deny' };
   });
+
+  // Set Content Security Policy for production builds
+  if (!isDev) {
+    contents.session.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            [
+              // Default to same origin
+              "default-src 'self'",
+              // Allow scripts from self and inline (React requires this)
+              "script-src 'self' 'unsafe-inline'",
+              // Allow styles from self, inline, and data URIs (for Tailwind)
+              "style-src 'self' 'unsafe-inline'",
+              // Allow images from self, data URIs, and HTTPS sources
+              "img-src 'self' data: https:",
+              // Allow fonts from self
+              "font-src 'self' data:",
+              // Allow connections to APIs and WebSockets
+              "connect-src 'self' https: wss:",
+              // Prevent embedding in iframes (clickjacking protection)
+              "frame-ancestors 'none'",
+              // Form action restriction
+              "form-action 'self'",
+              // Base URI restriction
+              "base-uri 'self'",
+            ].join('; '),
+          ],
+        },
+      });
+    });
+  }
 });

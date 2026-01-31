@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import { getDb } from '../../database/init';
 import { Transaction } from '../../database/schema';
 import { desc, eq, like, and, gte, lte } from 'drizzle-orm';
@@ -8,6 +8,7 @@ import { Input, Select } from '../../components/Input';
 import { EmptyState } from '../../components/EmptyState';
 import { SkeletonCard } from '../../components/Skeleton';
 import { format } from 'date-fns';
+import { logger } from '../../utils/logger';
 
 type TransactionType = 'all' | 'buy' | 'sell' | 'transfer_in' | 'transfer_out' | 'swap' | 'reward' | 'airdrop';
 
@@ -20,6 +21,93 @@ interface FilterState {
 }
 
 const ITEMS_PER_PAGE = 25;
+
+// Memoized helper functions
+const getTypeColor = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'buy':
+      return 'bg-profit/20 text-profit';
+    case 'sell':
+      return 'bg-loss/20 text-loss';
+    case 'transfer_in':
+    case 'reward':
+    case 'airdrop':
+      return 'bg-primary-500/20 text-primary-400';
+    case 'transfer_out':
+      return 'bg-warning/20 text-warning';
+    case 'swap':
+      return 'bg-surface-600 text-surface-300';
+    default:
+      return 'bg-surface-700 text-surface-400';
+  }
+};
+
+const getTypeLabel = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'buy':
+      return 'Buy';
+    case 'sell':
+      return 'Sell';
+    case 'transfer_in':
+      return 'Deposit';
+    case 'transfer_out':
+      return 'Withdraw';
+    case 'swap':
+      return 'Swap';
+    case 'reward':
+      return 'Reward';
+    case 'airdrop':
+      return 'Airdrop';
+    default:
+      return type;
+  }
+};
+
+// Memoized transaction row component
+const TransactionRow = memo(function TransactionRow({ tx }: { tx: Transaction }) {
+  const isIncoming = tx.type === 'buy' || tx.type === 'transfer_in' || tx.type === 'reward' || tx.type === 'airdrop';
+  const isOutgoing = tx.type === 'sell' || tx.type === 'transfer_out';
+
+  return (
+    <div
+      className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-surface-800/50 transition-colors items-center"
+      role="row"
+    >
+      <div className="col-span-2 text-surface-300 text-sm">
+        {tx.timestamp && format(new Date(tx.timestamp), 'MMM dd, yyyy HH:mm')}
+      </div>
+      <div className="col-span-1">
+        <span className={`px-2 py-1 text-xs font-medium rounded ${getTypeColor(tx.type)}`}>
+          {getTypeLabel(tx.type)}
+        </span>
+      </div>
+      <div className="col-span-2">
+        <span className="font-medium text-surface-100">{tx.asset}</span>
+      </div>
+      <div className="col-span-2 text-right">
+        <span
+          className={`font-mono ${
+            isIncoming ? 'text-profit' : isOutgoing ? 'text-loss' : 'text-surface-100'
+          }`}
+        >
+          {isIncoming ? '+' : isOutgoing ? '-' : ''}
+          {tx.amount?.toLocaleString(undefined, { maximumFractionDigits: 8 })}
+        </span>
+      </div>
+      <div className="col-span-2 text-right text-surface-300 font-mono">
+        {tx.priceUsd ? `$${tx.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-'}
+      </div>
+      <div className="col-span-2 text-right text-surface-100 font-mono">
+        {tx.priceUsd && tx.amount
+          ? `$${(tx.priceUsd * tx.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+          : '-'}
+      </div>
+      <div className="col-span-1 text-right text-surface-500 text-sm truncate" title={tx.exchangeId || tx.walletAddress || ''}>
+        {tx.exchangeId || (tx.walletAddress ? `${tx.walletAddress.slice(0, 6)}...` : '-')}
+      </div>
+    </div>
+  );
+});
 
 export function HistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -35,7 +123,7 @@ export function HistoryPage() {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
     setIsLoading(true);
     try {
       const db = getDb();
@@ -79,64 +167,24 @@ export function HistoryPage() {
 
       setTransactions(txs);
     } catch (error) {
-      console.error('Failed to load transactions:', error);
+      logger.error('Failed to load transactions:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, filters]);
 
   useEffect(() => {
     loadTransactions();
-  }, [currentPage, filters]);
+  }, [loadTransactions]);
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  const getTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'buy':
-        return 'bg-profit/20 text-profit';
-      case 'sell':
-        return 'bg-loss/20 text-loss';
-      case 'transfer_in':
-      case 'reward':
-      case 'airdrop':
-        return 'bg-primary-500/20 text-primary-400';
-      case 'transfer_out':
-        return 'bg-warning/20 text-warning';
-      case 'swap':
-        return 'bg-surface-600 text-surface-300';
-      default:
-        return 'bg-surface-700 text-surface-400';
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'buy':
-        return 'Buy';
-      case 'sell':
-        return 'Sell';
-      case 'transfer_in':
-        return 'Deposit';
-      case 'transfer_out':
-        return 'Withdraw';
-      case 'swap':
-        return 'Swap';
-      case 'reward':
-        return 'Reward';
-      case 'airdrop':
-        return 'Airdrop';
-      default:
-        return type;
-    }
-  };
-
-  const handleFilterChange = (key: keyof FilterState, value: string) => {
+  const handleFilterChange = useCallback((key: keyof FilterState, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setCurrentPage(1);
-  };
+  }, []);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({
       type: 'all',
       asset: '',
@@ -145,7 +193,12 @@ export function HistoryPage() {
       search: '',
     });
     setCurrentPage(1);
-  };
+  }, []);
+
+  const handleFirstPage = useCallback(() => setCurrentPage(1), []);
+  const handlePrevPage = useCallback(() => setCurrentPage((p) => p - 1), []);
+  const handleNextPage = useCallback(() => setCurrentPage((p) => p + 1), []);
+  const handleLastPage = useCallback(() => setCurrentPage(totalPages), [totalPages]);
 
   const hasActiveFilters = filters.type !== 'all' || filters.asset || filters.dateFrom || filters.dateTo;
 
@@ -278,53 +331,9 @@ export function HistoryPage() {
             </div>
 
             {/* Table Body */}
-            <div className="divide-y divide-surface-800">
+            <div className="divide-y divide-surface-800" role="rowgroup">
               {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-surface-800/50 transition-colors items-center"
-                >
-                  <div className="col-span-2 text-surface-300 text-sm">
-                    {tx.timestamp && format(new Date(tx.timestamp), 'MMM dd, yyyy HH:mm')}
-                  </div>
-                  <div className="col-span-1">
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${getTypeColor(tx.type)}`}>
-                      {getTypeLabel(tx.type)}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium text-surface-100">{tx.asset}</span>
-                  </div>
-                  <div className="col-span-2 text-right">
-                    <span
-                      className={`font-mono ${
-                        tx.type === 'buy' || tx.type === 'transfer_in' || tx.type === 'reward' || tx.type === 'airdrop'
-                          ? 'text-profit'
-                          : tx.type === 'sell' || tx.type === 'transfer_out'
-                          ? 'text-loss'
-                          : 'text-surface-100'
-                      }`}
-                    >
-                      {tx.type === 'buy' || tx.type === 'transfer_in' || tx.type === 'reward' || tx.type === 'airdrop'
-                        ? '+'
-                        : tx.type === 'sell' || tx.type === 'transfer_out'
-                        ? '-'
-                        : ''}
-                      {tx.amount?.toLocaleString(undefined, { maximumFractionDigits: 8 })}
-                    </span>
-                  </div>
-                  <div className="col-span-2 text-right text-surface-300 font-mono">
-                    {tx.priceUsd ? `$${tx.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-'}
-                  </div>
-                  <div className="col-span-2 text-right text-surface-100 font-mono">
-                    {tx.priceUsd && tx.amount
-                      ? `$${(tx.priceUsd * tx.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                      : '-'}
-                  </div>
-                  <div className="col-span-1 text-right text-surface-500 text-sm truncate" title={tx.exchangeId || tx.walletAddress || ''}>
-                    {tx.exchangeId || (tx.walletAddress ? `${tx.walletAddress.slice(0, 6)}...` : '-')}
-                  </div>
-                </div>
+                <TransactionRow key={tx.id} tx={tx} />
               ))}
             </div>
 
@@ -335,12 +344,13 @@ export function HistoryPage() {
                   Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
                   {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount}
                 </div>
-                <div className="flex items-center gap-2">
+                <nav className="flex items-center gap-2" aria-label="Pagination">
                   <Button
                     variant="ghost"
                     size="sm"
                     disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(1)}
+                    onClick={handleFirstPage}
+                    aria-label="Go to first page"
                   >
                     First
                   </Button>
@@ -348,18 +358,20 @@ export function HistoryPage() {
                     variant="ghost"
                     size="sm"
                     disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
+                    onClick={handlePrevPage}
+                    aria-label="Go to previous page"
                   >
                     Previous
                   </Button>
-                  <span className="px-3 py-1 text-sm text-surface-300">
+                  <span className="px-3 py-1 text-sm text-surface-300" aria-current="page">
                     Page {currentPage} of {totalPages}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
                     disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
+                    onClick={handleNextPage}
+                    aria-label="Go to next page"
                   >
                     Next
                   </Button>
@@ -367,11 +379,12 @@ export function HistoryPage() {
                     variant="ghost"
                     size="sm"
                     disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
+                    onClick={handleLastPage}
+                    aria-label="Go to last page"
                   >
                     Last
                   </Button>
-                </div>
+                </nav>
               </div>
             )}
           </>
