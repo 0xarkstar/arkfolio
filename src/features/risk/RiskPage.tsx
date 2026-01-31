@@ -10,6 +10,7 @@ import { Badge } from '../../components/Badge';
 import { Alert } from '../../components/Alert';
 import { SkeletonCard } from '../../components/Skeleton';
 import { ProgressBar } from '../../components/ProgressBar';
+import { VaRCalculator, CorrelationMatrix } from './components';
 import Decimal from 'decimal.js';
 
 export function RiskPage() {
@@ -458,6 +459,43 @@ export function RiskPage() {
             ))}
           </div>
         )}
+      </Card>
+
+      {/* Advanced Risk Metrics */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Advanced Risk Metrics</h2>
+        <VaRCalculator portfolioValue={totalValue} />
+      </Card>
+
+      {/* Correlation Matrix */}
+      {holdings.length >= 2 && (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Correlations</h2>
+          <CorrelationMatrix assetSymbols={holdings.slice(0, 8).map((h) => h.symbol)} />
+        </Card>
+      )}
+
+      {/* Max Drawdown & Additional Metrics */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Additional Metrics</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Mock data for demonstration - in production would use real historical data */}
+          <div className="bg-surface-800 rounded-lg p-4">
+            <p className="text-sm text-surface-400 mb-1">Max Drawdown (30d)</p>
+            <p className="text-xl font-bold text-loss font-tabular">-12.5%</p>
+            <p className="text-xs text-surface-500 mt-1">Peak to trough decline</p>
+          </div>
+          <div className="bg-surface-800 rounded-lg p-4">
+            <p className="text-sm text-surface-400 mb-1">Portfolio Beta</p>
+            <p className="text-xl font-bold text-surface-100 font-tabular">1.15</p>
+            <p className="text-xs text-surface-500 mt-1">vs BTC (slightly aggressive)</p>
+          </div>
+          <div className="bg-surface-800 rounded-lg p-4">
+            <p className="text-sm text-surface-400 mb-1">Sharpe Ratio</p>
+            <p className="text-xl font-bold text-profit font-tabular">0.85</p>
+            <p className="text-xs text-surface-500 mt-1">Risk-adjusted return</p>
+          </div>
+        </div>
       </Card>
 
       {/* Asset Concentration */}

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTaxStore } from '../../stores/taxStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
+import { excelExportService } from '../../services/export';
 import { toast } from '../../components/Toast';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -85,19 +86,30 @@ export function TaxPage() {
   };
 
   const handleExportExcel = () => {
-    // For now, export as CSV with different extension
-    // Full Excel support would require a library like xlsx
-    const csv = exportCSV();
-    if (!csv) {
+    if (!summary || summary.taxableTransactions.length === 0) {
       toast.error('No data to export');
       return;
     }
 
-    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `tax_report_${selectedYear}.xlsx`;
-    link.click();
+    excelExportService.exportTaxReport({
+      year: selectedYear,
+      summary: {
+        totalGainsKrw: summary.totalGainsKrw,
+        totalLossesKrw: summary.totalLossesKrw,
+        netGainsKrw: summary.netGainsKrw,
+        taxableGainsKrw: summary.taxableGainsKrw,
+        estimatedTaxKrw: summary.estimatedTaxKrw,
+      },
+      transactions: summary.taxableTransactions.map((tx) => ({
+        date: tx.date,
+        type: tx.type,
+        asset: tx.asset,
+        amount: tx.amount,
+        priceKrw: tx.priceKrw,
+        gainLossKrw: tx.gainLossKrw ?? undefined,
+      })),
+    });
+
     toast.success(`Tax report exported as Excel`);
   };
 

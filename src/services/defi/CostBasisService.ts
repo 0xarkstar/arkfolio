@@ -3,6 +3,7 @@ import axios from 'axios';
 import { DefiPosition } from '../../stores/defiStore';
 import { zapperService } from './ZapperService';
 import { httpWithRetry } from '../utils/httpUtils';
+import { logger } from '../../utils/logger';
 
 // GraphQL query for transaction history - minimal query to avoid server errors
 const TRANSACTION_HISTORY_QUERY = `
@@ -318,7 +319,7 @@ class CostBasisService {
 
     // Return cached if valid
     if (!options.skipCache && !isExpired && this.cachedTransactions.has(cacheKey)) {
-      console.log('Using cached transaction history');
+      logger.debug('Using cached transaction history');
       return this.cachedTransactions.get(cacheKey)!;
     }
 
@@ -332,7 +333,7 @@ class CostBasisService {
     let pageCount = 0;
     const maxPages = options.maxPages || 100; // Default to 100 pages (2000 transactions at 20 per page)
 
-    console.log(`Fetching transaction history for ${walletAddress}...`);
+    logger.debug(`Fetching transaction history for ${walletAddress}...`);
 
     try {
       do {
@@ -347,7 +348,7 @@ class CostBasisService {
         );
 
         if (response.errors?.length) {
-          console.error('Zapper transaction API errors:', response.errors);
+          logger.error('Zapper transaction API errors:', response.errors);
           throw new Error(response.errors[0].message);
         }
 
@@ -365,7 +366,7 @@ class CostBasisService {
         cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
         pageCount++;
 
-        console.log(`Fetched page ${pageCount}, total transactions: ${allTransactions.length}`);
+        logger.debug(`Fetched page ${pageCount}, total transactions: ${allTransactions.length}`);
 
         // Add small delay to avoid rate limiting
         if (cursor) {
@@ -377,27 +378,29 @@ class CostBasisService {
       this.cachedTransactions.set(cacheKey, allTransactions);
       this.cacheTimestamps.set(cacheKey, Date.now());
 
-      console.log(`Total transactions fetched: ${allTransactions.length}`);
+      logger.debug(`Total transactions fetched: ${allTransactions.length}`);
 
       // Show date range of fetched transactions
       if (allTransactions.length > 0) {
         const newest = new Date(allTransactions[0].transaction.timestamp * 1000);
         const oldest = new Date(allTransactions[allTransactions.length - 1].transaction.timestamp * 1000);
-        console.log(`Date range: ${oldest.toLocaleDateString()} ~ ${newest.toLocaleDateString()}`);
+        logger.debug(`Date range: ${oldest.toLocaleDateString()} ~ ${newest.toLocaleDateString()}`);
       }
 
       // Log sample of transactions for debugging
-      console.log('\n=== Sample Transactions (first 10) ===');
-      allTransactions.slice(0, 10).forEach((tx, i) => {
-        const date = new Date(tx.transaction.timestamp * 1000).toLocaleDateString();
-        const appName = tx.app ? `${tx.app.displayName} (${tx.app.slug})` : 'Unknown App';
-        console.log(`${i + 1}. [${date}] [${tx.transaction.network}] ${appName}`);
-      });
-      console.log('======================================\n');
+      if (logger.isDebugEnabled()) {
+        logger.debug('=== Sample Transactions (first 10) ===');
+        allTransactions.slice(0, 10).forEach((tx, i) => {
+          const date = new Date(tx.transaction.timestamp * 1000).toLocaleDateString();
+          const appName = tx.app ? `${tx.app.displayName} (${tx.app.slug})` : 'Unknown App';
+          logger.debug(`${i + 1}. [${date}] [${tx.transaction.network}] ${appName}`);
+        });
+        logger.debug('======================================');
+      }
 
       return allTransactions;
     } catch (error) {
-      console.error('Failed to fetch transaction history:', error);
+      logger.error('Failed to fetch transaction history:', error);
       throw error;
     }
   }
@@ -509,14 +512,14 @@ class CostBasisService {
   ): Promise<{ description: string; tokens: Array<{ symbol: string; amount: Decimal; priceUsd: number }> } | null> {
     const chainId = NETWORK_TO_CHAIN_ID[network];
     if (!chainId) {
-      console.log(`Unknown network for chain ID: ${network}`);
+      logger.debug(`Unknown network for chain ID: ${network}`);
       return null;
     }
 
     // Check localStorage cache first
     const cached = this.getCachedTxDetails(hash, network);
     if (cached) {
-      console.log(`  -> [CACHE HIT] ${hash.slice(0, 10)}...`);
+      logger.debug(`  -> [CACHE HIT] ${hash.slice(0, 10)}...`);
       return {
         description: cached.description,
         tokens: cached.tokens.map(t => ({
@@ -535,7 +538,7 @@ class CostBasisService {
       );
 
       if (response.errors?.length) {
-        console.log(`Error fetching tx details: ${response.errors[0].message}`);
+        logger.debug(`Error fetching tx details: ${response.errors[0].message}`);
         return null;
       }
 
@@ -573,7 +576,7 @@ class CostBasisService {
 
       return { description, tokens };
     } catch (error) {
-      console.log(`Failed to fetch tx details for ${hash}: ${error}`);
+      logger.debug(`Failed to fetch tx details for ${hash}: ${error}`);
       return null;
     }
   }
@@ -596,8 +599,8 @@ class CostBasisService {
       const matchedTxs: TimelineEventV2[] = [];
 
       const cacheStats = this.getCacheStats();
-      console.log(`\n=== Searching transactions for ${position.protocol} (${position.chain}) ===`);
-      console.log(`[Cache] ${cacheStats.txDetailsCount} tx details cached in localStorage`);
+      logger.debug(`=== Searching transactions for ${position.protocol} (${position.chain}) ===`);
+      logger.debug(`[Cache] ${cacheStats.txDetailsCount} tx details cached in localStorage`);
 
       for (const tx of transactions) {
         if (!tx.app) continue;
@@ -611,11 +614,11 @@ class CostBasisService {
       }
 
       if (matchedTxs.length === 0) {
-        console.log(`No transactions found for ${position.protocol}`);
+        logger.debug(`No transactions found for ${position.protocol}`);
         return null;
       }
 
-      console.log(`Found ${matchedTxs.length} matching transactions, fetching details...`);
+      logger.debug(`Found ${matchedTxs.length} matching transactions, fetching details...`);
 
       // Fetch details for each matched transaction (limit to first 10 to avoid too many API calls)
       const entries: CostBasisEntry[] = [];
@@ -623,7 +626,7 @@ class CostBasisService {
 
       for (const tx of txsToProcess) {
         const timestamp = new Date(tx.transaction.timestamp * 1000);
-        console.log(`Fetching details for ${tx.transaction.hash.slice(0, 10)}... (${timestamp.toLocaleDateString()})`);
+        logger.debug(`Fetching details for ${tx.transaction.hash.slice(0, 10)}... (${timestamp.toLocaleDateString()})`);
 
         const details = await this.fetchTransactionDetails(
           tx.transaction.hash,
@@ -634,12 +637,12 @@ class CostBasisService {
         if (details && details.description) {
           // Check if this is an entry transaction (deposit, stake, etc.)
           if (!this.isEntryTransaction(details.description)) {
-            console.log(`  -> Not an entry tx: "${details.description.slice(0, 50)}..."`);
+            logger.debug(`  -> Not an entry tx: "${details.description.slice(0, 50)}..."`);
             continue;
           }
 
-          console.log(`  -> Entry: "${details.description.slice(0, 50)}..."`);
-          console.log(`  -> Tokens found: ${details.tokens.length}`);
+          logger.debug(`  -> Entry: "${details.description.slice(0, 50)}..."`);
+          logger.debug(`  -> Tokens found: ${details.tokens.length}`);
 
           // Calculate cost from tokens
           let totalCost = new Decimal(0);
@@ -651,7 +654,7 @@ class CostBasisService {
             // No tokens in API response - try to parse from description
             const parsed = this.parseAmountFromDescription(details.description);
             if (parsed) {
-              console.log(`  -> Parsed from description: ${parsed.amount} ${parsed.symbol}`);
+              logger.debug(`  -> Parsed from description: ${parsed.amount} ${parsed.symbol}`);
               mainSymbol = parsed.symbol;
               mainAmount = parsed.amount;
               // Estimate price - for now use current position value ratio
@@ -659,7 +662,7 @@ class CostBasisService {
                 mainPrice = position.currentValueUsd.dividedBy(position.amounts[0]).toNumber();
               }
               totalCost = mainAmount.times(mainPrice);
-              console.log(`  -> Estimated cost: $${totalCost.toFixed(2)} (price: $${mainPrice.toFixed(2)})`);
+              logger.debug(`  -> Estimated cost: $${totalCost.toFixed(2)} (price: $${mainPrice.toFixed(2)})`);
             }
           } else {
             for (const token of details.tokens) {
@@ -673,7 +676,7 @@ class CostBasisService {
                 mainPrice = token.priceUsd;
               }
 
-              console.log(`  -> Token: ${token.amount.toFixed(4)} ${token.symbol} @ $${token.priceUsd.toFixed(2)} = $${tokenCost.toFixed(2)}`);
+              logger.debug(`  -> Token: ${token.amount.toFixed(4)} ${token.symbol} @ $${token.priceUsd.toFixed(2)} = $${tokenCost.toFixed(2)}`);
             }
           }
 
@@ -687,9 +690,9 @@ class CostBasisService {
               txHash: tx.transaction.hash,
               description: details.description,
             });
-            console.log(`  -> Added entry: $${totalCost.toFixed(2)}`);
+            logger.debug(`  -> Added entry: $${totalCost.toFixed(2)}`);
           } else {
-            console.log(`  -> Skipped: could not determine cost`);
+            logger.debug(`  -> Skipped: could not determine cost`);
           }
         }
 
@@ -698,7 +701,7 @@ class CostBasisService {
       }
 
       if (entries.length === 0) {
-        console.log(`No entry transactions with cost data found for ${position.protocol}`);
+        logger.debug(`No entry transactions with cost data found for ${position.protocol}`);
         return null;
       }
 
@@ -708,10 +711,10 @@ class CostBasisService {
       const firstEntryDate = entries[0].date;
       const totalCostBasisUsd = entries.reduce((sum, e) => sum.plus(e.totalCostUsd), new Decimal(0));
 
-      console.log(`\nCost basis for ${position.protocol}:`);
-      console.log(`  Entries: ${entries.length}`);
-      console.log(`  First entry: ${firstEntryDate.toLocaleDateString()}`);
-      console.log(`  Total cost: $${totalCostBasisUsd.toFixed(2)}`);
+      logger.debug(`Cost basis for ${position.protocol}:`);
+      logger.debug(`  Entries: ${entries.length}`);
+      logger.debug(`  First entry: ${firstEntryDate.toLocaleDateString()}`);
+      logger.debug(`  Total cost: $${totalCostBasisUsd.toFixed(2)}`);
 
       return {
         positionId: position.id,
@@ -720,7 +723,7 @@ class CostBasisService {
         firstEntryDate,
       };
     } catch (error) {
-      console.error(`Failed to calculate cost basis for position ${position.id}:`, error);
+      logger.error(`Failed to calculate cost basis for position ${position.id}:`, error);
       return null;
     }
   }
@@ -737,31 +740,31 @@ class CostBasisService {
     const results = new Map<string, PositionCostBasis>();
 
     // Fetch transaction history once (it will be cached)
-    console.log(`\n[CostBasisService] Fetching transaction history for ${walletAddress}...`);
+    logger.debug(`[CostBasisService] Fetching transaction history for ${walletAddress}...`);
     await this.fetchTransactionHistory(walletAddress);
 
     let completed = 0;
     for (const position of positions) {
-      console.log(`\n[CostBasisService] Processing position: ${position.protocol} (${position.id})`);
+      logger.debug(`[CostBasisService] Processing position: ${position.protocol} (${position.id})`);
       const costBasis = await this.calculateCostBasis(position, walletAddress);
 
       if (costBasis) {
-        console.log(`[CostBasisService] Cost basis found: $${costBasis.totalCostBasisUsd.toFixed(2)}`);
+        logger.debug(`[CostBasisService] Cost basis found: $${costBasis.totalCostBasisUsd.toFixed(2)}`);
         results.set(position.id, costBasis);
         // Notify immediately when a position is calculated
         if (onPositionCalculated) {
-          console.log(`[CostBasisService] Calling onPositionCalculated callback...`);
+          logger.debug(`[CostBasisService] Calling onPositionCalculated callback...`);
           onPositionCalculated(position.id, costBasis);
         }
       } else {
-        console.log(`[CostBasisService] No cost basis found for ${position.protocol}`);
+        logger.debug(`[CostBasisService] No cost basis found for ${position.protocol}`);
       }
 
       completed++;
       onProgress?.(completed, positions.length);
     }
 
-    console.log(`\n[CostBasisService] Batch complete. ${results.size} positions with cost basis.`);
+    logger.debug(`[CostBasisService] Batch complete. ${results.size} positions with cost basis.`);
     return results;
   }
 
@@ -836,7 +839,7 @@ class CostBasisService {
       }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    console.log(`Cleared ${keysToRemove.length} cached transaction details`);
+    logger.debug(`Cleared ${keysToRemove.length} cached transaction details`);
   }
 
   /**

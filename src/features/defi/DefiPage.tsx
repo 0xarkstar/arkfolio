@@ -12,7 +12,8 @@ import { Alert } from '../../components/Alert';
 import { Modal, ModalFooter } from '../../components/Modal';
 import { SkeletonCard, SectionLoading } from '../../components/Skeleton';
 import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
-import Decimal from 'decimal.js';
+import { Decimal, parseDecimal, toDecimal, toDisplayNumber } from '../../utils/decimal';
+import { ILCalculator } from './components';
 
 type SortField = 'protocol' | 'value' | 'apy' | 'type';
 type SortDirection = 'asc' | 'desc';
@@ -221,17 +222,17 @@ export function DefiPage() {
 
     try {
       const assets = formAssets.split(',').map(a => a.trim().toUpperCase()).filter(a => a);
-      const amount = parseFloat(formAmount) || 0;
-      const value = parseFloat(formValue) || 0;
-      const costBasis = parseFloat(formCostBasis) || value;
-      const apy = formApy ? parseFloat(formApy) : null;
-      const healthFactor = formHealthFactor ? parseFloat(formHealthFactor) : null;
+      const amount = parseDecimal(formAmount);
+      const value = parseDecimal(formValue);
+      const costBasis = formCostBasis ? parseDecimal(formCostBasis) : value;
+      const apy = formApy ? toDisplayNumber(parseDecimal(formApy)) : null;
+      const healthFactor = formHealthFactor ? toDisplayNumber(parseDecimal(formHealthFactor)) : null;
 
       if (assets.length === 0) {
         throw new Error('Please enter at least one asset');
       }
 
-      if (value <= 0) {
+      if (value.lessThanOrEqualTo(0)) {
         throw new Error('Please enter a valid current value');
       }
 
@@ -241,9 +242,9 @@ export function DefiPage() {
         positionType: formType,
         poolAddress: null,
         assets,
-        amounts: [new Decimal(amount)],
-        costBasisUsd: new Decimal(costBasis),
-        currentValueUsd: new Decimal(value),
+        amounts: [amount],
+        costBasisUsd: costBasis,
+        currentValueUsd: value,
         rewardsEarned: {},
         apy,
         maturityDate: null,
@@ -286,18 +287,18 @@ export function DefiPage() {
         throw new Error('Please enter a protocol name');
       }
 
-      const balance = parseFloat(pointsBalance) || 0;
-      if (balance <= 0) {
+      const balance = parseDecimal(pointsBalance);
+      if (balance.lessThanOrEqualTo(0)) {
         throw new Error('Please enter a valid points balance');
       }
 
-      const estValue = pointsEstValue ? parseFloat(pointsEstValue) : null;
+      const estValue = pointsEstValue ? parseDecimal(pointsEstValue) : null;
 
       await addPoints({
         protocol: pointsProtocol.trim(),
         walletAddress: '',
-        pointsBalance: new Decimal(balance),
-        estimatedValueUsd: estValue ? new Decimal(estValue) : null,
+        pointsBalance: balance,
+        estimatedValueUsd: estValue,
         lastSync: new Date(),
       });
 
@@ -447,10 +448,9 @@ export function DefiPage() {
 
     const headers = ['Protocol', 'Type', 'Chain', 'Assets', 'Value (USD)', 'Cost Basis (USD)', 'APY (%)', 'Health Factor', 'P&L (USD)', 'P&L (%)'];
     const rows = filteredAndSortedPositions.map(p => {
-      const pnl = p.currentValueUsd.minus(p.costBasisUsd).toNumber();
-      const pnlPercent = p.costBasisUsd.toNumber() > 0
-        ? (pnl / p.costBasisUsd.toNumber() * 100)
-        : 0;
+      const pnl = toDisplayNumber(p.currentValueUsd.minus(p.costBasisUsd));
+      const costBasisNum = toDisplayNumber(p.costBasisUsd);
+      const pnlPercent = costBasisNum > 0 ? (pnl / costBasisNum * 100) : 0;
       return [
         p.protocol,
         p.positionType,
@@ -479,8 +479,8 @@ export function DefiPage() {
   };
 
   const totalValue = storePositions.length > 0
-    ? getTotalValueUsd().toNumber()
-    : mockPositions.reduce((sum, p) => sum + p.currentValueUsd.toNumber(), 0);
+    ? toDisplayNumber(getTotalValueUsd())
+    : mockPositions.reduce((sum, p) => sum + toDisplayNumber(p.currentValueUsd), 0);
 
   const avgApy = storePositions.length > 0
     ? getAverageApy()
@@ -490,7 +490,7 @@ export function DefiPage() {
   const lowestHealth = storePositions.length > 0 ? getLowestHealthFactor() : null;
 
   const formatCurrency = (value: number | Decimal) => {
-    const num = value instanceof Decimal ? value.toNumber() : value;
+    const num = toDisplayNumber(toDecimal(value));
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -850,7 +850,7 @@ export function DefiPage() {
                   <Badge size="sm">Points</Badge>
                 </div>
                 <p className="text-2xl font-bold text-primary-400 font-tabular">
-                  {point.pointsBalance.toNumber().toLocaleString()}
+                  {toDisplayNumber(point.pointsBalance).toLocaleString()}
                 </p>
                 {point.estimatedValueUsd && (
                   <p className="text-sm text-surface-400 mt-1">
@@ -862,6 +862,11 @@ export function DefiPage() {
           </div>
         )}
       </Card>
+
+      {/* IL & Risk Analysis */}
+      {positions.length > 0 && (
+        <ILCalculator positions={positions} />
+      )}
 
       {/* Risk Overview */}
       <Card className="p-6">
@@ -900,7 +905,7 @@ export function DefiPage() {
                 {formatCurrency(
                   positions
                     .filter((p) => p.positionType === 'lp')
-                    .reduce((sum, p) => sum + p.currentValueUsd.toNumber(), 0)
+                    .reduce((sum, p) => sum + toDisplayNumber(p.currentValueUsd), 0)
                 )}
               </p>
               <p className="text-xs text-surface-500">

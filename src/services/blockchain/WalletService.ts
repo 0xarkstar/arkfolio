@@ -10,6 +10,8 @@ import { EVMProvider } from './EVMProvider';
 import { SolanaProvider } from './SolanaProvider';
 import { CHAIN_CONFIGS, getEVMChains } from './chains';
 import { priceService } from '../price';
+import { logger } from '../../utils/logger';
+import { BlockchainError, BlockchainErrorType } from '../utils/httpUtils';
 
 interface WalletServiceConfig {
   apiKeys?: Partial<Record<Chain, string>>;
@@ -101,13 +103,17 @@ class WalletService {
 
       const provider = this.providers.get(chain);
       if (!provider) {
-        console.warn(`No provider for chain ${chain}`);
-        return null;
+        throw new BlockchainError(
+          `No provider configured for chain ${chain}`,
+          BlockchainErrorType.CHAIN_NOT_SUPPORTED,
+          { chain }
+        );
       }
 
       return await provider.getNativeBalance(address);
     } catch (error) {
-      console.error(`Failed to fetch native balance for ${chain}:`, error);
+      const blockchainError = BlockchainError.fromError(error, BlockchainErrorType.RPC_ERROR, { chain, address });
+      logger.error(`Failed to fetch native balance for ${chain}:`, blockchainError.message);
       return null;
     }
   }
@@ -135,8 +141,11 @@ class WalletService {
 
       const provider = this.providers.get(chain);
       if (!provider) {
-        console.warn(`No provider for chain ${chain}`);
-        return [];
+        throw new BlockchainError(
+          `No provider configured for chain ${chain}`,
+          BlockchainErrorType.CHAIN_NOT_SUPPORTED,
+          { chain }
+        );
       }
 
       if (useCommonOnly) {
@@ -144,7 +153,8 @@ class WalletService {
       }
       return await provider.getAllTokenBalances(address, { filterUnknown });
     } catch (error) {
-      console.error(`Failed to fetch token balances for ${chain}:`, error);
+      const blockchainError = BlockchainError.fromError(error, BlockchainErrorType.RPC_ERROR, { chain, address });
+      logger.error(`Failed to fetch token balances for ${chain}:`, blockchainError.message);
       return [];
     }
   }
@@ -159,14 +169,18 @@ class WalletService {
   ): Promise<OnchainTransaction[]> {
     const provider = this.providers.get(chain);
     if (!provider) {
-      console.warn(`No provider for chain ${chain}`);
-      return [];
+      throw new BlockchainError(
+        `No provider configured for chain ${chain}`,
+        BlockchainErrorType.CHAIN_NOT_SUPPORTED,
+        { chain }
+      );
     }
 
     try {
       return await provider.getTransactionHistory(address, limit);
     } catch (error) {
-      console.error(`Failed to fetch transactions for ${chain}:`, error);
+      const blockchainError = BlockchainError.fromError(error, BlockchainErrorType.RPC_ERROR, { chain, address });
+      logger.error(`Failed to fetch transactions for ${chain}:`, blockchainError.message);
       return [];
     }
   }

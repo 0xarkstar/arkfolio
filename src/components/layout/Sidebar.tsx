@@ -18,6 +18,8 @@ const navItems: NavItem[] = [
   { id: 'exchanges', label: 'Exchanges', icon: '🏦' },
   { id: 'wallets', label: 'Wallets', icon: '👛' },
   { id: 'defi', label: 'DeFi', icon: '🌐' },
+  { id: 'nft', label: 'NFTs', icon: '🖼️' },
+  { id: 'rebalance', label: 'Rebalance', icon: '⚖️' },
   { id: 'history', label: 'History', icon: '📜' },
   { id: 'risk', label: 'Risk', icon: '⚠️' },
   { id: 'alerts', label: 'Alerts', icon: '🔔' },

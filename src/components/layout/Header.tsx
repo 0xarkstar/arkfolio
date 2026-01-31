@@ -15,6 +15,8 @@ const viewTitles: Record<ViewId, string> = {
   exchanges: 'Exchanges',
   wallets: 'Wallets',
   defi: 'DeFi Positions',
+  nft: 'NFT Gallery',
+  rebalance: 'Portfolio Rebalancing',
   risk: 'Risk Management',
   tax: 'Tax Report',
   history: 'Transaction History',

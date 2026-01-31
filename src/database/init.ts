@@ -238,6 +238,16 @@ async function createTables(): Promise<void> {
       updated_at INTEGER
     );
 
+    -- Target Allocations for Rebalancing
+    CREATE TABLE IF NOT EXISTS target_allocations (
+      id TEXT PRIMARY KEY,
+      asset TEXT NOT NULL,
+      target_percent REAL NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
     -- Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_balances_exchange ON balances(exchange_id);
     CREATE INDEX IF NOT EXISTS idx_positions_exchange ON positions(exchange_id);

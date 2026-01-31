@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import axios from 'axios';
 import { httpWithRetry, HttpError, HttpErrorType } from '../utils/httpUtils';
+import { logger } from '../../utils/logger';
 
 export interface PriceData {
   symbol: string;
@@ -263,9 +264,9 @@ class PriceService {
       }
     } catch (error) {
       if (error instanceof HttpError && error.type === HttpErrorType.RATE_LIMIT) {
-        console.warn(`CoinGecko rate limit hit. Retry after ${error.retryAfter}s`);
+        logger.warn(`CoinGecko rate limit hit. Retry after ${error.retryAfter}s`);
       } else {
-        console.error('Failed to fetch prices from CoinGecko:', error);
+        logger.error('Failed to fetch prices from CoinGecko:', error);
       }
       // Return empty result on error, cached data may still be used
     }
