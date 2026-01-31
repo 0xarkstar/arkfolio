@@ -30,8 +30,14 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
+            lib: {
+              formats: ['cjs'],
+            },
             rollupOptions: {
               external: ['electron'],
+              output: {
+                format: 'cjs',
+              },
             },
           },
         },
@@ -52,6 +58,17 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
       },
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-zustand': ['zustand'],
+          'vendor-charts': ['lightweight-charts'],
+          'vendor-date': ['date-fns'],
+          'vendor-decimal': ['decimal.js'],
+          // Feature chunks are auto-split by lazy loading
+        },
+      },
     },
   },
   optimizeDeps: {
@@ -60,5 +77,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      '/api/zapper': {
+        target: 'https://public.zapper.xyz',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/zapper/, ''),
+        secure: true,
+      },
+    },
   },
 });

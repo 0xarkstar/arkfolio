@@ -1,4 +1,4 @@
-import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, ReactNode } from 'react';
+import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, ReactNode, useId } from 'react';
 
 // Base Input
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -11,7 +11,11 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, leftIcon, rightIcon, size = 'md', className = '', ...props }, ref) => {
+  ({ label, error, hint, leftIcon, rightIcon, size = 'md', className = '', id: providedId, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = providedId || generatedId;
+    const errorId = error ? `${inputId}-error` : undefined;
+    const hintId = hint && !error ? `${inputId}-hint` : undefined;
     const getSizeStyles = () => {
       switch (size) {
         case 'sm':
@@ -39,18 +43,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-surface-300 mb-1.5">
+          <label htmlFor={inputId} className="block text-sm font-medium text-surface-300 mb-1.5">
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className={`absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 ${getIconSize()}`}>
+            <div className={`absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 ${getIconSize()}`} aria-hidden="true">
               {leftIcon}
             </div>
           )}
           <input
             ref={ref}
+            id={inputId}
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={errorId || hintId}
             className={`
               w-full bg-surface-800 border rounded-lg text-surface-100 placeholder-surface-500
               focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
@@ -65,13 +72,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 ${getIconSize()}`}>
+            <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 ${getIconSize()}`} aria-hidden="true">
               {rightIcon}
             </div>
           )}
         </div>
-        {error && <p className="mt-1 text-xs text-loss">{error}</p>}
-        {hint && !error && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
+        {error && <p id={errorId} className="mt-1 text-xs text-loss" role="alert">{error}</p>}
+        {hint && !error && <p id={hintId} className="mt-1 text-xs text-surface-500">{hint}</p>}
       </div>
     );
   }
@@ -87,16 +94,24 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, hint, className = '', ...props }, ref) => {
+  ({ label, error, hint, className = '', id: providedId, ...props }, ref) => {
+    const generatedId = useId();
+    const textareaId = providedId || generatedId;
+    const errorId = error ? `${textareaId}-error` : undefined;
+    const hintId = hint && !error ? `${textareaId}-hint` : undefined;
+
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-surface-300 mb-1.5">
+          <label htmlFor={textareaId} className="block text-sm font-medium text-surface-300 mb-1.5">
             {label}
           </label>
         )}
         <textarea
           ref={ref}
+          id={textareaId}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={errorId || hintId}
           className={`
             w-full bg-surface-800 border rounded-lg text-surface-100 placeholder-surface-500
             focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
@@ -107,8 +122,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           `}
           {...props}
         />
-        {error && <p className="mt-1 text-xs text-loss">{error}</p>}
-        {hint && !error && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
+        {error && <p id={errorId} className="mt-1 text-xs text-loss" role="alert">{error}</p>}
+        {hint && !error && <p id={hintId} className="mt-1 text-xs text-surface-500">{hint}</p>}
       </div>
     );
   }
@@ -192,11 +207,12 @@ interface RadioGroupProps {
     disabled?: boolean;
   }>;
   className?: string;
+  'aria-label'?: string;
 }
 
-export function RadioGroup({ name, value, onChange, options, className = '' }: RadioGroupProps) {
+export function RadioGroup({ name, value, onChange, options, className = '', 'aria-label': ariaLabel }: RadioGroupProps) {
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div role="radiogroup" aria-label={ariaLabel} className={`space-y-2 ${className}`}>
       {options.map((option) => (
         <Radio
           key={option.value}
@@ -300,7 +316,12 @@ interface SelectProps extends Omit<InputHTMLAttributes<HTMLSelectElement>, 'size
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, options, placeholder, size = 'md', className = '', ...props }, ref) => {
+  ({ label, error, hint, options, placeholder, size = 'md', className = '', id: providedId, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = providedId || generatedId;
+    const errorId = error ? `${selectId}-error` : undefined;
+    const hintId = hint && !error ? `${selectId}-hint` : undefined;
+
     const getSizeStyles = () => {
       switch (size) {
         case 'sm':
@@ -316,12 +337,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-surface-300 mb-1.5">
+          <label htmlFor={selectId} className="block text-sm font-medium text-surface-300 mb-1.5">
             {label}
           </label>
         )}
         <select
           ref={ref}
+          id={selectId}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={errorId || hintId}
           className={`
             w-full bg-surface-800 border rounded-lg text-surface-100
             focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
@@ -351,8 +375,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="mt-1 text-xs text-loss">{error}</p>}
-        {hint && !error && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
+        {error && <p id={errorId} className="mt-1 text-xs text-loss" role="alert">{error}</p>}
+        {hint && !error && <p id={hintId} className="mt-1 text-xs text-surface-500">{hint}</p>}
       </div>
     );
   }
