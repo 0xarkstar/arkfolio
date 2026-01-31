@@ -3,6 +3,7 @@ import { useNavigationStore, ViewId } from '../../stores/navigationStore';
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  onMobileClose?: () => void;
 }
 
 interface NavItem {
@@ -24,12 +25,17 @@ const navItems: NavItem[] = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   const { currentView, setView } = useNavigationStore();
+
+  const handleNavClick = (viewId: ViewId) => {
+    setView(viewId);
+    onMobileClose?.(); // Close mobile menu after navigation
+  };
 
   return (
     <aside
-      className={`bg-surface-900 border-r border-surface-800 flex flex-col transition-all duration-300 ${
+      className={`bg-surface-900 border-r border-surface-800 flex flex-col transition-all duration-300 h-full ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
@@ -61,14 +67,15 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-2">
+      <nav className="flex-1 py-4 overflow-y-auto" aria-label="Main navigation">
+        <ul className="space-y-1 px-2" role="list">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => setView(item.id)}
+                  onClick={() => handleNavClick(item.id)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                     collapsed ? 'justify-center' : ''
                   } ${
@@ -77,8 +84,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       : 'text-surface-400 hover:bg-surface-800 hover:text-surface-100'
                   }`}
                   title={collapsed ? item.label : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                 >
-                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-lg" aria-hidden="true">{item.icon}</span>
                   {!collapsed && <span className="font-medium">{item.label}</span>}
                 </button>
               </li>

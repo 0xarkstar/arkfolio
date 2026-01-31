@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/appStore';
 import { useNavigationStore, ViewId } from './stores/navigationStore';
 import { useSettingsStore } from './stores/settingsStore';
@@ -6,21 +6,36 @@ import { initDatabase } from './database/init';
 import { useAutoSync } from './hooks';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './components/Dashboard';
-import { ExchangesPage } from './features/cex';
-import { PortfolioPage } from './features/portfolio';
-import { WalletsPage } from './features/onchain';
-import { DefiPage } from './features/defi';
-import { RiskPage } from './features/risk';
-import { TaxPage } from './features/tax';
-import { SettingsPage } from './features/settings';
-import { AlertsPage } from './features/alerts/AlertsPage';
-import { HistoryPage } from './features/history/HistoryPage';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KeyboardShortcuts, useKeyboardNavigation } from './components/KeyboardShortcuts';
 import { Onboarding, useOnboarding } from './components/Onboarding';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
+
+// Lazy load feature pages for code splitting
+const ExchangesPage = lazy(() => import('./features/cex').then(m => ({ default: m.ExchangesPage })));
+const PortfolioPage = lazy(() => import('./features/portfolio').then(m => ({ default: m.PortfolioPage })));
+const WalletsPage = lazy(() => import('./features/onchain').then(m => ({ default: m.WalletsPage })));
+const DefiPage = lazy(() => import('./features/defi').then(m => ({ default: m.DefiPage })));
+const RiskPage = lazy(() => import('./features/risk').then(m => ({ default: m.RiskPage })));
+const TaxPage = lazy(() => import('./features/tax').then(m => ({ default: m.TaxPage })));
+const SettingsPage = lazy(() => import('./features/settings').then(m => ({ default: m.SettingsPage })));
+const AlertsPage = lazy(() => import('./features/alerts/AlertsPage').then(m => ({ default: m.AlertsPage })));
+const HistoryPage = lazy(() => import('./features/history/HistoryPage').then(m => ({ default: m.HistoryPage })));
+
+// Loading fallback for lazy-loaded pages
+function PageLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500 mx-auto mb-3"></div>
+        <p className="text-surface-500 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +100,7 @@ function App() {
 
   return (
     <>
+      <OfflineIndicator />
       {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
       <MainLayout>
         <ErrorBoundary>
@@ -98,30 +114,40 @@ function App() {
 }
 
 function PageRouter({ currentView }: { currentView: ViewId }) {
-  switch (currentView) {
-    case 'dashboard':
-      return <Dashboard />;
-    case 'portfolio':
-      return <PortfolioPage />;
-    case 'exchanges':
-      return <ExchangesPage />;
-    case 'wallets':
-      return <WalletsPage />;
-    case 'defi':
-      return <DefiPage />;
-    case 'risk':
-      return <RiskPage />;
-    case 'tax':
-      return <TaxPage />;
-    case 'history':
-      return <HistoryPage />;
-    case 'alerts':
-      return <AlertsPage />;
-    case 'settings':
-      return <SettingsPage />;
-    default:
-      return <Dashboard />;
+  // Dashboard is not lazy-loaded as it's the default landing page
+  if (currentView === 'dashboard') {
+    return <Dashboard />;
   }
+
+  // All other pages are lazy-loaded with Suspense
+  return (
+    <Suspense fallback={<PageLoadingFallback />}>
+      {(() => {
+        switch (currentView) {
+          case 'portfolio':
+            return <PortfolioPage />;
+          case 'exchanges':
+            return <ExchangesPage />;
+          case 'wallets':
+            return <WalletsPage />;
+          case 'defi':
+            return <DefiPage />;
+          case 'risk':
+            return <RiskPage />;
+          case 'tax':
+            return <TaxPage />;
+          case 'history':
+            return <HistoryPage />;
+          case 'alerts':
+            return <AlertsPage />;
+          case 'settings':
+            return <SettingsPage />;
+          default:
+            return <Dashboard />;
+        }
+      })()}
+    </Suspense>
+  );
 }
 
 export default App;

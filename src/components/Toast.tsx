@@ -55,7 +55,12 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <div
+      className="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+    >
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} onClose={() => removeToast(t.id)} />
       ))}
@@ -101,6 +106,8 @@ function ToastItem({ toast: t, onClose }: { toast: Toast; onClose: () => void })
 
   return (
     <div
+      role={t.type === 'error' ? 'alert' : 'status'}
+      aria-live={t.type === 'error' ? 'assertive' : 'polite'}
       className={`
         flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg
         transition-all duration-200
@@ -109,13 +116,14 @@ function ToastItem({ toast: t, onClose }: { toast: Toast; onClose: () => void })
       `}
       style={{ minWidth: '280px', maxWidth: '400px' }}
     >
-      <span className="text-lg">{getIcon()}</span>
+      <span className="text-lg" aria-hidden="true">{getIcon()}</span>
       <p className="flex-1 text-sm">{t.message}</p>
       <button
         onClick={handleClose}
         className="text-current opacity-60 hover:opacity-100 transition-opacity"
+        aria-label="Dismiss notification"
       >
-        ✕
+        <span aria-hidden="true">✕</span>
       </button>
     </div>
   );

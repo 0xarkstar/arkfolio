@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, KeyboardEvent } from 'react';
 
 interface CardProps {
   children: ReactNode;
@@ -7,6 +7,7 @@ interface CardProps {
   hover?: boolean;
   onClick?: () => void;
   variant?: 'default' | 'bordered' | 'elevated';
+  'aria-label'?: string;
 }
 
 export function Card({
@@ -16,7 +17,14 @@ export function Card({
   hover = false,
   onClick,
   variant = 'default',
+  'aria-label': ariaLabel,
 }: CardProps) {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick();
+    }
+  };
   const getPaddingStyles = () => {
     switch (padding) {
       case 'none':
@@ -51,8 +59,10 @@ export function Card({
     <div
       className={`rounded-xl ${getVariantStyles()} ${getPaddingStyles()} ${interactiveStyles} ${className}`}
       onClick={onClick}
+      onKeyDown={onClick ? handleKeyDown : undefined}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
+      aria-label={ariaLabel}
     >
       {children}
     </div>

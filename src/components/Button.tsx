@@ -73,6 +73,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        aria-disabled={disabled || loading || undefined}
         className={`
           inline-flex items-center justify-center font-medium rounded-lg
           transition-colors duration-150
@@ -91,6 +93,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <circle
               className="opacity-25"
@@ -107,10 +110,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         ) : (
-          leftIcon && <span className={getIconSize()}>{leftIcon}</span>
+          leftIcon && <span className={getIconSize()} aria-hidden="true">{leftIcon}</span>
         )}
         {children}
-        {rightIcon && !loading && <span className={getIconSize()}>{rightIcon}</span>}
+        {rightIcon && !loading && <span className={getIconSize()} aria-hidden="true">{rightIcon}</span>}
       </button>
     );
   }
@@ -209,11 +212,16 @@ IconButton.displayName = 'IconButton';
 interface ButtonGroupProps {
   children: ReactNode;
   className?: string;
+  'aria-label'?: string;
 }
 
-export function ButtonGroup({ children, className = '' }: ButtonGroupProps) {
+export function ButtonGroup({ children, className = '', 'aria-label': ariaLabel }: ButtonGroupProps) {
   return (
-    <div className={`inline-flex rounded-lg overflow-hidden ${className}`}>
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className={`inline-flex rounded-lg overflow-hidden ${className}`}
+    >
       {children}
     </div>
   );

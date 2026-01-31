@@ -22,7 +22,11 @@ const viewTitles: Record<ViewId, string> = {
   settings: 'Settings',
 };
 
-export default function Header() {
+interface HeaderProps {
+  onMobileMenuToggle?: () => void;
+}
+
+export default function Header({ onMobileMenuToggle }: HeaderProps) {
   const { currentView } = useNavigationStore();
   const { isDbReady } = useAppStore();
   const { syncAllExchanges, accounts } = useExchangeStore();
@@ -75,12 +79,35 @@ export default function Header() {
   };
 
   return (
-    <header className="h-14 bg-surface-900 border-b border-surface-800 flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-lg font-semibold text-surface-100">
+    <header className="h-14 bg-surface-900 border-b border-surface-800 flex items-center justify-between px-4 md:px-6">
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Mobile menu toggle */}
+        <button
+          onClick={onMobileMenuToggle}
+          className="p-2 -ml-2 text-surface-400 hover:text-surface-100 hover:bg-surface-800 rounded-lg transition-colors md:hidden"
+          aria-label="Toggle navigation menu"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+        <h1 className="text-base md:text-lg font-semibold text-surface-100">
           {viewTitles[currentView]}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           <span
             className={`w-2 h-2 rounded-full ${
               isDbReady ? 'bg-profit' : 'bg-warning animate-pulse'
@@ -92,18 +119,20 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <GlobalSearch />
+      <div className="flex items-center gap-2 md:gap-4">
+        <div className="hidden lg:block">
+          <GlobalSearch />
+        </div>
         <NotificationBell />
 
         {settings.autoSync && (
-          <div className="flex items-center gap-1.5 text-xs text-surface-500">
+          <div className="hidden xl:flex items-center gap-1.5 text-xs text-surface-500">
             <span className="w-1.5 h-1.5 rounded-full bg-profit"></span>
             <span>Auto-sync {settings.syncInterval}m</span>
           </div>
         )}
 
-        <div className="text-sm text-surface-400">
+        <div className="hidden md:block text-sm text-surface-400">
           <span>Last sync: </span>
           <span className="text-surface-300">{formatLastSync(lastSync)}</span>
         </div>
@@ -114,6 +143,7 @@ export default function Header() {
           variant="secondary"
           size="sm"
           loading={isSyncing}
+          aria-label="Sync all data"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -126,13 +156,14 @@ export default function Header() {
             strokeLinecap="round"
             strokeLinejoin="round"
             className={isSyncing ? 'animate-spin' : ''}
+            aria-hidden="true"
           >
             <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
             <path d="M3 3v5h5" />
             <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
             <path d="M16 16h5v5" />
           </svg>
-          Sync All
+          <span className="hidden sm:inline">Sync All</span>
         </Button>
       </div>
     </header>

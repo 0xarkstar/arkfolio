@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDisconnect } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
 import { toast } from '../../components/Toast';
@@ -10,6 +11,7 @@ import { Card } from '../../components/Card';
 import { Alert } from '../../components/Alert';
 import { SkeletonCard } from '../../components/Skeleton';
 import { zapperService } from '../../services/defi';
+import { availableLanguages, changeLanguage } from '../../i18n';
 import {
   settings as settingsTable,
   exchanges as exchangesTable,
@@ -27,6 +29,7 @@ import {
 export function SettingsPage() {
   const { settings, isLoading, isSaving, loadSettings, updateSetting } = useSettingsStore();
   const { disconnect } = useDisconnect();
+  const { i18n } = useTranslation();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -330,12 +333,15 @@ export function SettingsPage() {
               <p className="text-sm text-surface-400">Select interface language</p>
             </div>
             <Select
-              value={settings.language}
-              onChange={(e) => handleSettingChange('language', e.target.value as AppSettings['language'])}
-              options={[
-                { value: 'en', label: 'English' },
-                { value: 'ko', label: 'Korean' },
-              ]}
+              value={i18n.language.split('-')[0]}
+              onChange={(e) => {
+                changeLanguage(e.target.value);
+                handleSettingChange('language', e.target.value as AppSettings['language']);
+              }}
+              options={availableLanguages.map((lang) => ({
+                value: lang.code,
+                label: lang.nativeName,
+              }))}
               className="w-32"
             />
           </div>
