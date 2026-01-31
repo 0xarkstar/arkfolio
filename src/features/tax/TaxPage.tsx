@@ -85,32 +85,36 @@ export function TaxPage() {
     toast.success(`Tax report exported as CSV`);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!summary || summary.taxableTransactions.length === 0) {
       toast.error('No data to export');
       return;
     }
 
-    excelExportService.exportTaxReport({
-      year: selectedYear,
-      summary: {
-        totalGainsKrw: summary.totalGainsKrw,
-        totalLossesKrw: summary.totalLossesKrw,
-        netGainsKrw: summary.netGainsKrw,
-        taxableGainsKrw: summary.taxableGainsKrw,
-        estimatedTaxKrw: summary.estimatedTaxKrw,
-      },
-      transactions: summary.taxableTransactions.map((tx) => ({
-        date: tx.date,
-        type: tx.type,
-        asset: tx.asset,
-        amount: tx.amount,
-        priceKrw: tx.priceKrw,
-        gainLossKrw: tx.gainLossKrw ?? undefined,
-      })),
-    });
+    try {
+      await excelExportService.exportTaxReport({
+        year: selectedYear,
+        summary: {
+          totalGainsKrw: summary.totalGainsKrw,
+          totalLossesKrw: summary.totalLossesKrw,
+          netGainsKrw: summary.netGainsKrw,
+          taxableGainsKrw: summary.taxableGainsKrw,
+          estimatedTaxKrw: summary.estimatedTaxKrw,
+        },
+        transactions: summary.taxableTransactions.map((tx) => ({
+          date: tx.date,
+          type: tx.type,
+          asset: tx.asset,
+          amount: tx.amount,
+          priceKrw: tx.priceKrw,
+          gainLossKrw: tx.gainLossKrw ?? undefined,
+        })),
+      });
 
-    toast.success(`Tax report exported as Excel`);
+      toast.success(`Tax report exported as Excel`);
+    } catch (error) {
+      toast.error('Failed to export Excel file');
+    }
   };
 
   const filteredAndSortedTransactions = useMemo(() => {
