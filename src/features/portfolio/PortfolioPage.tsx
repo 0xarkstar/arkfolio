@@ -119,31 +119,35 @@ export function PortfolioPage() {
     toast.success('Portfolio exported to CSV');
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (holdings.length === 0) {
       toast.error('No holdings to export');
       return;
     }
 
-    excelExportService.exportPortfolio({
-      holdings: holdings.map((h) => ({
-        symbol: h.symbol,
-        name: h.name,
-        amount: h.totalAmount,
-        priceUsd: h.priceUsd,
-        valueUsd: h.valueUsd,
-        allocation: summary.totalValueUsd.greaterThan(0)
-          ? h.valueUsd.div(summary.totalValueUsd).times(100).toNumber()
-          : 0,
-        change24h: h.change24h,
-      })),
-      summary: {
-        totalValueUsd: summary.totalValueUsd,
-        assetCount: summary.totalAssets,
-      },
-    });
+    try {
+      await excelExportService.exportPortfolio({
+        holdings: holdings.map((h) => ({
+          symbol: h.symbol,
+          name: h.name,
+          amount: h.totalAmount,
+          priceUsd: h.priceUsd,
+          valueUsd: h.valueUsd,
+          allocation: summary.totalValueUsd.greaterThan(0)
+            ? h.valueUsd.div(summary.totalValueUsd).times(100).toNumber()
+            : 0,
+          change24h: h.change24h,
+        })),
+        summary: {
+          totalValueUsd: summary.totalValueUsd,
+          assetCount: summary.totalAssets,
+        },
+      });
 
-    toast.success('Portfolio exported to Excel');
+      toast.success('Portfolio exported to Excel');
+    } catch (error) {
+      toast.error('Failed to export Excel file');
+    }
   };
 
   return (

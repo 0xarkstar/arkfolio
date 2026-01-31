@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import Decimal from 'decimal.js';
 
 export interface ExcelExportOptions {
@@ -86,58 +86,90 @@ class ExcelExportService {
   /**
    * Export generic data to Excel
    */
-  exportToExcel(options: ExcelExportOptions): void {
-    const workbook = XLSX.utils.book_new();
+  async exportToExcel(options: ExcelExportOptions): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'ArkFolio';
+    workbook.created = new Date();
 
     for (const sheet of options.sheets) {
-      // Prepare headers and data
+      // Prepare headers and keys
       const headers = sheet.columns?.map((c) => c.header) || Object.keys(sheet.data[0] || {});
       const keys = sheet.columns?.map((c) => c.key) || Object.keys(sheet.data[0] || {});
 
-      // Create rows
-      const rows = sheet.data.map((row) =>
-        keys.map((key) => {
+      // Create worksheet
+      const worksheet = workbook.addWorksheet(sheet.name.slice(0, 31)); // Excel sheet name limit
+
+      // Set column definitions
+      if (sheet.columns) {
+        worksheet.columns = sheet.columns.map((c) => ({
+          header: c.header,
+          key: c.key,
+          width: c.width || 15,
+        }));
+      } else {
+        worksheet.columns = headers.map((h, i) => ({
+          header: h,
+          key: keys[i],
+          width: 15,
+        }));
+      }
+
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' },
+      };
+
+      // Add data rows
+      for (const row of sheet.data) {
+        const rowData = keys.map((key) => {
           const value = row[key];
           if (value instanceof Decimal) return value.toNumber();
           if (value instanceof Date) return this.formatDate(value);
           return value;
-        })
-      );
-
-      // Create worksheet
-      const wsData = [headers, ...rows];
-      const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-
-      // Apply column widths
-      if (sheet.columns) {
-        worksheet['!cols'] = sheet.columns.map((c) => ({
-          wch: c.width || 15,
-        }));
+        });
+        worksheet.addRow(rowData);
       }
 
-      // Style header row (bold) - xlsx-js-style would be needed for full styling
-      // For basic xlsx, we'll rely on the data format
-
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name.slice(0, 31)); // Excel sheet name limit
+      // Apply number formats based on column format
+      if (sheet.columns) {
+        sheet.columns.forEach((col, colIndex) => {
+          const column = worksheet.getColumn(colIndex + 1);
+          switch (col.format) {
+            case 'currency':
+              column.numFmt = '#,##0.00';
+              break;
+            case 'percent':
+              column.numFmt = '0.00%';
+              break;
+            case 'number':
+              column.numFmt = '#,##0.########';
+              break;
+          }
+        });
+      }
     }
 
     // Generate and download
-    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    this.downloadFile(buffer, options.filename);
+    const buffer = await workbook.xlsx.writeBuffer();
+    this.downloadFile(buffer as ArrayBuffer, options.filename);
   }
 
   /**
    * Export portfolio holdings to Excel
    */
-  exportPortfolio(data: PortfolioExportData, filename?: string): void {
+  async exportPortfolio(data: PortfolioExportData, filename?: string): Promise<void> {
     const holdingsData = data.holdings.map((h) => ({
       symbol: h.symbol,
       name: h.name || h.symbol,
       amount: this.toNumber(h.amount),
       priceUsd: this.toNumber(h.priceUsd),
       valueUsd: this.toNumber(h.valueUsd),
-      allocation: h.allocation,
-      change24h: h.change24h ?? 0,
+      allocation: h.allocation / 100, // Convert to decimal for percent format
+      change24h: (h.change24h ?? 0) / 100,
     }));
 
     const summaryData = [
@@ -147,7 +179,7 @@ class ExcelExportService {
       { metric: 'Asset Count', value: data.summary.assetCount },
     ];
 
-    this.exportToExcel({
+    await this.exportToExcel({
       filename: filename || `portfolio-${this.formatDate(new Date())}.xlsx`,
       sheets: [
         {
@@ -178,7 +210,7 @@ class ExcelExportService {
   /**
    * Export tax report to Excel
    */
-  exportTaxReport(data: TaxExportData, filename?: string): void {
+  async exportTaxReport(data: TaxExportData, filename?: string): Promise<void> {
     const summaryData = [
       { metric: 'Tax Year', value: data.year },
       { metric: 'Total Gains (KRW)', value: this.toNumber(data.summary.totalGainsKrw) },
@@ -198,7 +230,7 @@ class ExcelExportService {
       exchange: tx.exchange || '',
     }));
 
-    this.exportToExcel({
+    await this.exportToExcel({
       filename: filename || `tax-report-${data.year}.xlsx`,
       sheets: [
         {
@@ -229,7 +261,7 @@ class ExcelExportService {
   /**
    * Export transaction history to Excel
    */
-  exportTransactions(data: TransactionExportData, filename?: string): void {
+  async exportTransactions(data: TransactionExportData, filename?: string): Promise<void> {
     const transactionsData = data.transactions.map((tx) => ({
       date: this.formatDate(tx.date),
       type: tx.type,
@@ -243,7 +275,7 @@ class ExcelExportService {
       txHash: tx.txHash || '',
     }));
 
-    this.exportToExcel({
+    await this.exportToExcel({
       filename: filename || `transactions-${this.formatDate(new Date())}.xlsx`,
       sheets: [
         {
@@ -269,7 +301,7 @@ class ExcelExportService {
   /**
    * Export DeFi positions to Excel
    */
-  exportDefiPositions(
+  async exportDefiPositions(
     positions: {
       protocol: string;
       type: string;
@@ -282,7 +314,7 @@ class ExcelExportService {
       healthFactor?: number;
     }[],
     filename?: string
-  ): void {
+  ): Promise<void> {
     const data = positions.map((p) => ({
       protocol: p.protocol,
       type: p.type,
@@ -291,11 +323,11 @@ class ExcelExportService {
       valueUsd: this.toNumber(p.valueUsd),
       costBasisUsd: this.toNumber(p.costBasisUsd),
       pnl: this.toNumber(p.pnl),
-      apy: p.apy || 0,
+      apy: (p.apy || 0) / 100, // Convert to decimal for percent format
       healthFactor: p.healthFactor || 0,
     }));
 
-    this.exportToExcel({
+    await this.exportToExcel({
       filename: filename || `defi-positions-${this.formatDate(new Date())}.xlsx`,
       sheets: [
         {
