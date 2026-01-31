@@ -65,15 +65,19 @@ export function EmptyState({
 
 // Pre-built empty states for common scenarios
 export function NoDataEmptyState({
-  onAction
+  onAction,
+  title,
+  description,
 }: {
-  onAction?: () => void
+  onAction?: () => void;
+  title?: string;
+  description?: string;
 }) {
   return (
     <EmptyState
       icon="📊"
-      title="No Data Available"
-      description="There's nothing to display yet. Add some data to get started."
+      title={title || "No Data Yet"}
+      description={description || "Start by adding your first item to see your data here."}
       action={onAction ? { label: 'Get Started', onClick: onAction } : undefined}
     />
   );
@@ -89,10 +93,10 @@ export function NoResultsEmptyState({
   return (
     <EmptyState
       icon="🔍"
-      title="No Results Found"
+      title="No Matches Found"
       description={searchTerm
-        ? `No items match "${searchTerm}". Try adjusting your search or filters.`
-        : "No items match your current filters."
+        ? `Nothing matches "${searchTerm}". Try a different search term or adjust your filters.`
+        : "No items match your current filters. Try broadening your search criteria."
       }
       action={onClear ? { label: 'Clear Filters', onClick: onClear, variant: 'secondary' } : undefined}
     />
@@ -107,26 +111,103 @@ export function NoConnectionEmptyState({
   return (
     <EmptyState
       icon="🔗"
-      title="No Connections"
-      description="Connect an exchange or add a wallet to start tracking your portfolio."
-      action={{ label: 'Connect Now', onClick: onConnect }}
+      title="Connect Your First Wallet"
+      description="Link an exchange account or add a wallet address to start tracking your crypto portfolio in one place."
+      action={{ label: 'Add Wallet', onClick: onConnect }}
+    />
+  );
+}
+
+export function NoExchangeEmptyState({
+  onConnect
+}: {
+  onConnect: () => void
+}) {
+  return (
+    <EmptyState
+      icon="🏦"
+      title="No Exchanges Connected"
+      description="Connect your exchange account with read-only API keys to automatically sync your balances and trading history."
+      action={{ label: 'Connect Exchange', onClick: onConnect }}
+    />
+  );
+}
+
+export function NoDefiEmptyState({
+  onConnect
+}: {
+  onConnect: () => void
+}) {
+  return (
+    <EmptyState
+      icon="🌾"
+      title="No DeFi Positions Found"
+      description="Your DeFi positions will appear here once you connect wallets with active positions, or you can add positions manually."
+      action={{ label: 'Add Position', onClick: onConnect }}
+    />
+  );
+}
+
+export function NoTransactionsEmptyState({
+  onSync
+}: {
+  onSync?: () => void
+}) {
+  return (
+    <EmptyState
+      icon="📋"
+      title="No Transactions Yet"
+      description="Your trading history will appear here after syncing your exchanges. Transactions are used for tax reporting and P&L tracking."
+      action={onSync ? { label: 'Sync Now', onClick: onSync } : undefined}
+    />
+  );
+}
+
+export function NoTaxDataEmptyState({
+  onSync
+}: {
+  onSync?: () => void
+}) {
+  return (
+    <EmptyState
+      icon="📑"
+      title="No Tax Data Available"
+      description="Sync your exchange transactions to calculate capital gains and generate tax reports. We support FIFO, LIFO, and HIFO methods."
+      action={onSync ? { label: 'Sync Transactions', onClick: onSync } : undefined}
     />
   );
 }
 
 export function ErrorEmptyState({
   onRetry,
-  message
+  message,
+  title
 }: {
   onRetry?: () => void;
   message?: string;
+  title?: string;
 }) {
   return (
     <EmptyState
       icon="⚠️"
-      title="Something Went Wrong"
-      description={message || "We couldn't load this data. Please try again."}
+      title={title || "Something Went Wrong"}
+      description={message || "We couldn't load this data. This might be a temporary issue. Please try again."}
       action={onRetry ? { label: 'Try Again', onClick: onRetry, variant: 'secondary' } : undefined}
+    />
+  );
+}
+
+export function OfflineEmptyState({
+  onRetry
+}: {
+  onRetry?: () => void
+}) {
+  return (
+    <EmptyState
+      icon="📶"
+      title="You're Offline"
+      description="Check your internet connection and try again. Your local data is still available."
+      action={onRetry ? { label: 'Retry', onClick: onRetry, variant: 'secondary' } : undefined}
     />
   );
 }

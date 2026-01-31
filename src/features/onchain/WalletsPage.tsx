@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useWalletsStore, WalletWithBalances } from '../../stores/walletsStore';
-import { Chain, CHAIN_CONFIGS } from '../../services/blockchain';
+import { CHAIN_CONFIGS } from '../../services/blockchain';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Card } from '../../components/Card';
@@ -12,24 +12,50 @@ import { Badge } from '../../components/Badge';
 import { CopyButton } from '../../components/CopyButton';
 import { Alert } from '../../components/Alert';
 import { Modal, ModalFooter } from '../../components/Modal';
-import { SkeletonCard } from '../../components/Skeleton';
+import { SkeletonCard, SectionLoading } from '../../components/Skeleton';
 import { NoConnectionEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
+import { ChainSelectorModal, ChainType } from '../../components/ChainSelectorModal';
+import { useWalletConnectionSync } from '../../hooks/useWalletConnectionSync';
+import { useSolanaWalletSync } from '../../hooks/useSolanaWalletSync';
+import { useSuiWalletSync } from '../../hooks/useSuiWalletSync';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { useWalletModal as useSolanaWalletModal } from '@solana/wallet-adapter-react-ui';
+import { ConnectModal as SuiConnectModal } from '@mysten/dapp-kit';
 
-type SortField = 'label' | 'chain' | 'value' | 'assets';
+type SortField = 'label' | 'type' | 'value' | 'chains';
 type SortDirection = 'asc' | 'desc';
 
-const SUPPORTED_CHAINS = [
-  { id: Chain.ETHEREUM, name: 'Ethereum', icon: 'E' },
-  { id: Chain.ARBITRUM, name: 'Arbitrum', icon: 'A' },
-  { id: Chain.OPTIMISM, name: 'Optimism', icon: 'O' },
-  { id: Chain.BASE, name: 'Base', icon: 'B' },
-  { id: Chain.POLYGON, name: 'Polygon', icon: 'P' },
-  { id: Chain.BSC, name: 'BSC', icon: 'B' },
-  { id: Chain.AVALANCHE, name: 'Avalanche', icon: 'A' },
-  { id: Chain.SOLANA, name: 'Solana', icon: 'S' },
-];
-
 export function WalletsPage() {
+  // Sync connected wallets from all chains to store
+  useWalletConnectionSync();  // EVM (RainbowKit)
+  useSolanaWalletSync();       // Solana
+  useSuiWalletSync();          // SUI
+
+  // Chain selector modal state
+  const [isChainSelectorOpen, setIsChainSelectorOpen] = useState(false);
+
+  // SUI wallet connect modal state
+  const [isSuiModalOpen, setIsSuiModalOpen] = useState(false);
+
+  // Wallet connection modals
+  const { openConnectModal: openEvmModal } = useConnectModal();
+  const { setVisible: openSolanaModal } = useSolanaWalletModal();
+
+  const handleChainSelect = (chain: ChainType) => {
+    switch (chain) {
+      case 'evm':
+        openEvmModal?.();
+        break;
+      case 'solana':
+        openSolanaModal(true);
+        break;
+      case 'sui':
+        // Open SUI connect modal
+        setIsSuiModalOpen(true);
+        break;
+    }
+  };
+
   const {
     wallets,
     isLoading,
@@ -43,7 +69,6 @@ export function WalletsPage() {
   } = useWalletsStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newWalletChain, setNewWalletChain] = useState<Chain>(Chain.ETHEREUM);
   const [newWalletAddress, setNewWalletAddress] = useState('');
   const [newWalletLabel, setNewWalletLabel] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -53,7 +78,7 @@ export function WalletsPage() {
 
   // Search, filter, and sort state
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterChain, setFilterChain] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -62,13 +87,10 @@ export function WalletsPage() {
   }, [loadWallets]);
 
   const totalValue = getTotalValueUsd();
-  const uniqueChains = new Set(wallets.map((w) => w.chain)).size;
-  const totalTokens = wallets.reduce((sum, w) => sum + w.tokenBalances.length, 0);
-
-  // Get unique chains in wallets for filter dropdown
-  const walletsChains = useMemo(() =>
-    Array.from(new Set(wallets.map(w => w.chain))).sort(),
-    [wallets]
+  const totalChains = wallets.reduce((sum, w) => sum + w.chainBalances.length, 0);
+  const totalTokens = wallets.reduce(
+    (sum, w) => sum + w.chainBalances.reduce((cs, cb) => cs + cb.tokenBalances.length + (cb.nativeBalance ? 1 : 0), 0),
+    0
   );
 
   // Filter and sort wallets
@@ -81,13 +103,13 @@ export function WalletsPage() {
       filtered = filtered.filter(
         w => w.label.toLowerCase().includes(query) ||
              w.address.toLowerCase().includes(query) ||
-             CHAIN_CONFIGS[w.chain]?.name.toLowerCase().includes(query)
+             w.walletType.toLowerCase().includes(query)
       );
     }
 
-    // Apply chain filter
-    if (filterChain !== 'all') {
-      filtered = filtered.filter(w => w.chain === filterChain);
+    // Apply type filter
+    if (filterType !== 'all') {
+      filtered = filtered.filter(w => w.walletType === filterType);
     }
 
     // Apply sorting
@@ -97,24 +119,21 @@ export function WalletsPage() {
         case 'label':
           comparison = a.label.localeCompare(b.label);
           break;
-        case 'chain':
-          comparison = a.chain.localeCompare(b.chain);
+        case 'type':
+          comparison = a.walletType.localeCompare(b.walletType);
           break;
         case 'value':
           comparison = a.totalValueUsd.minus(b.totalValueUsd).toNumber();
           break;
-        case 'assets': {
-          const assetsA = a.tokenBalances.length + (a.nativeBalance ? 1 : 0);
-          const assetsB = b.tokenBalances.length + (b.nativeBalance ? 1 : 0);
-          comparison = assetsA - assetsB;
+        case 'chains':
+          comparison = a.chainBalances.length - b.chainBalances.length;
           break;
-        }
       }
       return sortDirection === 'desc' ? -comparison : comparison;
     });
 
     return sorted;
-  }, [wallets, searchQuery, filterChain, sortField, sortDirection]);
+  }, [wallets, searchQuery, filterType, sortField, sortDirection]);
 
   const handleExportCSV = () => {
     if (wallets.length === 0) {
@@ -122,34 +141,38 @@ export function WalletsPage() {
       return;
     }
 
-    const headers = ['Label', 'Address', 'Chain', 'Asset', 'Balance', 'Value (USD)'];
+    const headers = ['Label', 'Address', 'Type', 'Chain', 'Asset', 'Balance', 'Value (USD)'];
     const rows: string[][] = [];
 
     filteredAndSortedWallets.forEach(wallet => {
-      const chainName = CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain;
+      wallet.chainBalances.forEach(chainBalance => {
+        const chainName = CHAIN_CONFIGS[chainBalance.chain]?.name || chainBalance.chain;
 
-      // Add native balance
-      if (wallet.nativeBalance && wallet.nativeBalance.balance.greaterThan(0)) {
-        rows.push([
-          wallet.label,
-          wallet.address,
-          chainName,
-          wallet.nativeBalance.symbol,
-          wallet.nativeBalance.balance.toFixed(8),
-          wallet.nativeBalance.valueUsd?.toFixed(2) || '0',
-        ]);
-      }
+        // Add native balance
+        if (chainBalance.nativeBalance && chainBalance.nativeBalance.balance.greaterThan(0)) {
+          rows.push([
+            wallet.label,
+            wallet.address,
+            wallet.walletType,
+            chainName,
+            chainBalance.nativeBalance.symbol,
+            chainBalance.nativeBalance.balance.toFixed(8),
+            chainBalance.nativeBalance.valueUsd?.toFixed(2) || '0',
+          ]);
+        }
 
-      // Add token balances
-      wallet.tokenBalances.forEach(token => {
-        rows.push([
-          wallet.label,
-          wallet.address,
-          chainName,
-          token.token.symbol,
-          token.balance.toFixed(8),
-          token.valueUsd?.toFixed(2) || '0',
-        ]);
+        // Add token balances
+        chainBalance.tokenBalances.forEach(token => {
+          rows.push([
+            wallet.label,
+            wallet.address,
+            wallet.walletType,
+            chainName,
+            token.token.symbol,
+            token.balance.toFixed(8),
+            token.valueUsd?.toFixed(2) || '0',
+          ]);
+        });
       });
     });
 
@@ -172,8 +195,9 @@ export function WalletsPage() {
     setIsAdding(true);
 
     try {
-      await addWallet(newWalletAddress, newWalletChain, newWalletLabel);
-      toast.success(`Added wallet ${newWalletLabel || formatAddress(newWalletAddress)}`);
+      await addWallet(newWalletAddress, newWalletLabel);
+      const type = /^0x[a-fA-F0-9]{40}$/.test(newWalletAddress) ? 'EVM' : 'Solana';
+      toast.success(`Added ${type} wallet ${newWalletLabel || formatAddress(newWalletAddress)}`);
       setIsAddModalOpen(false);
       setNewWalletAddress('');
       setNewWalletLabel('');
@@ -219,6 +243,15 @@ export function WalletsPage() {
     return value.toFixed(8);
   };
 
+  const getWalletChainSummary = (wallet: WalletWithBalances) => {
+    if (wallet.chainBalances.length === 0) return 'No assets';
+    const chainNames = wallet.chainBalances
+      .slice(0, 3)
+      .map(cb => CHAIN_CONFIGS[cb.chain]?.name || cb.chain);
+    const more = wallet.chainBalances.length > 3 ? ` +${wallet.chainBalances.length - 3}` : '';
+    return chainNames.join(', ') + more;
+  };
+
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -240,8 +273,8 @@ export function WalletsPage() {
               <p className="text-2xl font-bold text-surface-100">{wallets.length}</p>
             </Card>
             <Card className="p-4">
-              <p className="text-sm text-surface-400">Chains</p>
-              <p className="text-2xl font-bold text-surface-100">{uniqueChains}</p>
+              <p className="text-sm text-surface-400">Active Chains</p>
+              <p className="text-2xl font-bold text-surface-100">{totalChains}</p>
             </Card>
             <Card className="p-4">
               <p className="text-sm text-surface-400">Total Tokens</p>
@@ -256,7 +289,7 @@ export function WalletsPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h2 className="text-lg font-semibold text-surface-100">
             Connected Wallets
-            {(searchQuery || filterChain !== 'all') && (
+            {(searchQuery || filterType !== 'all') && (
               <span className="text-surface-400 font-normal text-sm ml-2">
                 ({filteredAndSortedWallets.length} of {wallets.length})
               </span>
@@ -271,14 +304,12 @@ export function WalletsPage() {
               className="w-32"
             />
             <Select
-              value={filterChain}
-              onChange={(e) => setFilterChain(e.target.value)}
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
               options={[
-                { value: 'all', label: 'All Chains' },
-                ...walletsChains.map(chain => ({
-                  value: chain,
-                  label: CHAIN_CONFIGS[chain]?.name || chain,
-                })),
+                { value: 'all', label: 'All Types' },
+                { value: 'EVM', label: 'EVM Wallets' },
+                { value: 'SOLANA', label: 'Solana Wallets' },
               ]}
               size="sm"
               className="w-32"
@@ -295,8 +326,7 @@ export function WalletsPage() {
                 { value: 'value-asc', label: 'Value: Low to High' },
                 { value: 'label-asc', label: 'Name: A to Z' },
                 { value: 'label-desc', label: 'Name: Z to A' },
-                { value: 'chain-asc', label: 'Chain: A to Z' },
-                { value: 'assets-desc', label: 'Assets: Most First' },
+                { value: 'chains-desc', label: 'Chains: Most First' },
               ]}
               size="sm"
               className="w-40"
@@ -314,16 +344,17 @@ export function WalletsPage() {
                 Export CSV
               </Button>
             )}
-            <Button onClick={() => setIsAddModalOpen(true)} size="sm">
-              Add Wallet
+            <Button onClick={() => setIsChainSelectorOpen(true)} size="sm" variant="primary">
+              Connect Wallet
+            </Button>
+            <Button onClick={() => setIsAddModalOpen(true)} size="sm" variant="secondary">
+              Add Manually
             </Button>
           </div>
         </div>
 
         {isLoading && wallets.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-surface-400">Loading wallets...</div>
-          </div>
+          <SectionLoading message="Loading wallets..." />
         ) : wallets.length === 0 ? (
           <NoConnectionEmptyState onConnect={() => setIsAddModalOpen(true)} />
         ) : filteredAndSortedWallets.length === 0 ? (
@@ -331,7 +362,7 @@ export function WalletsPage() {
             searchTerm={searchQuery}
             onClear={() => {
               setSearchQuery('');
-              setFilterChain('all');
+              setFilterType('all');
             }}
           />
         ) : (
@@ -347,7 +378,9 @@ export function WalletsPage() {
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <ChainAvatar chain={wallet.chain} size="md" />
+                  <div className="w-10 h-10 rounded-full bg-surface-700 flex items-center justify-center text-lg">
+                    {wallet.walletType === 'EVM' ? '⟠' : '◎'}
+                  </div>
                   <div>
                     <p className="font-medium text-surface-100">{wallet.label}</p>
                     <div className="flex items-center gap-1">
@@ -362,7 +395,14 @@ export function WalletsPage() {
                       </span>
                     </div>
                   </div>
-                  <Badge size="sm">{CHAIN_CONFIGS[wallet.chain]?.name || wallet.chain}</Badge>
+                  <Badge size="sm" variant={wallet.walletType === 'EVM' ? 'primary' : 'info'}>
+                    {wallet.walletType}
+                  </Badge>
+                  {wallet.chainBalances.length > 0 && (
+                    <span className="text-xs text-surface-500">
+                      {getWalletChainSummary(wallet)}
+                    </span>
+                  )}
                 </div>
                 <div className="text-right">
                   {wallet.isLoading ? (
@@ -375,7 +415,7 @@ export function WalletsPage() {
                         {formatCurrency(wallet.totalValueUsd.toNumber())}
                       </p>
                       <p className="text-sm text-surface-400">
-                        {wallet.tokenBalances.length + (wallet.nativeBalance ? 1 : 0)} assets
+                        {wallet.chainBalances.length} chains
                       </p>
                     </>
                   )}
@@ -421,88 +461,131 @@ export function WalletsPage() {
             </div>
           </div>
 
-          {/* Native Balance */}
-          {selectedWallet.nativeBalance &&
-            selectedWallet.nativeBalance.balance.greaterThan(0) && (
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-surface-300 mb-2">Native Balance</h3>
-                <div className="flex items-center justify-between p-3 bg-surface-800 rounded">
-                  <div className="flex items-center gap-3">
-                    <AssetAvatar symbol={selectedWallet.nativeBalance.symbol} size="sm" />
-                    <span className="font-medium text-surface-100">
-                      {selectedWallet.nativeBalance.symbol}
+          {/* Chain Balances */}
+          {selectedWallet.chainBalances.length > 0 ? (
+            <div className="space-y-6">
+              {selectedWallet.chainBalances.map((chainBalance) => (
+                <div key={chainBalance.chain}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ChainAvatar chain={chainBalance.chain} size="sm" />
+                    <h3 className="text-sm font-medium text-surface-300">
+                      {CHAIN_CONFIGS[chainBalance.chain]?.name || chainBalance.chain}
+                    </h3>
+                    <span className="text-xs text-surface-500">
+                      {formatCurrency(chainBalance.totalValueUsd.toNumber())}
                     </span>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-surface-100 font-tabular">
-                      {formatBalance(selectedWallet.nativeBalance.balance.toNumber())}
-                    </p>
-                    {selectedWallet.nativeBalance.valueUsd && (
-                      <p className="text-sm text-surface-400 font-tabular">
-                        {formatCurrency(selectedWallet.nativeBalance.valueUsd.toNumber())}
-                      </p>
-                    )}
+
+                  <div className="space-y-2 pl-6">
+                    {/* Native Balance */}
+                    {chainBalance.nativeBalance &&
+                      chainBalance.nativeBalance.balance.greaterThan(0) && (
+                        <div className="flex items-center justify-between p-3 bg-surface-800 rounded">
+                          <div className="flex items-center gap-3">
+                            <AssetAvatar symbol={chainBalance.nativeBalance.symbol} size="sm" />
+                            <span className="font-medium text-surface-100">
+                              {chainBalance.nativeBalance.symbol}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-surface-100 font-tabular">
+                              {formatBalance(chainBalance.nativeBalance.balance.toNumber())}
+                            </p>
+                            {chainBalance.nativeBalance.valueUsd && (
+                              <p className="text-sm text-surface-400 font-tabular">
+                                {formatCurrency(chainBalance.nativeBalance.valueUsd.toNumber())}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Token Balances */}
+                    {chainBalance.tokenBalances.map((token, index) => (
+                      <div
+                        key={`${token.token.address}-${index}`}
+                        className="flex items-center justify-between p-3 bg-surface-800 rounded"
+                      >
+                        <div className="flex items-center gap-3">
+                          <AssetAvatar symbol={token.token.symbol} size="sm" />
+                          <div>
+                            <p className="font-medium text-surface-100">{token.token.symbol}</p>
+                            <p className="text-xs text-surface-500">{token.token.name}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-surface-100 font-tabular">
+                            {formatBalance(token.balance.toNumber())}
+                          </p>
+                          {token.valueUsd && (
+                            <p className="text-sm text-surface-400 font-tabular">
+                              {formatCurrency(token.valueUsd.toNumber())}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            )}
-
-          {/* Token Balances */}
-          {selectedWallet.tokenBalances.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-surface-300 mb-2">Tokens</h3>
-              <div className="space-y-2">
-                {selectedWallet.tokenBalances.map((token, index) => (
-                  <div
-                    key={`${token.token.address}-${index}`}
-                    className="flex items-center justify-between p-3 bg-surface-800 rounded"
-                  >
-                    <div className="flex items-center gap-3">
-                      <AssetAvatar symbol={token.token.symbol} size="sm" />
-                      <div>
-                        <p className="font-medium text-surface-100">{token.token.symbol}</p>
-                        <p className="text-xs text-surface-500">{token.token.name}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-surface-100 font-tabular">
-                        {formatBalance(token.balance.toNumber())}
-                      </p>
-                      {token.valueUsd && (
-                        <p className="text-sm text-surface-400 font-tabular">
-                          {formatCurrency(token.valueUsd.toNumber())}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-          )}
-
-          {!selectedWallet.isLoading &&
-            !selectedWallet.nativeBalance &&
-            selectedWallet.tokenBalances.length === 0 && (
+          ) : (
+            !selectedWallet.isLoading && (
               <p className="text-surface-400 text-center py-4">No assets found</p>
-            )}
+            )
+          )}
         </Card>
       )}
 
-      {/* Supported Chains */}
+      {/* Supported Chains Info */}
       <Card className="p-6">
         <h2 className="text-lg font-semibold text-surface-100 mb-4">Supported Chains</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          {SUPPORTED_CHAINS.map((chain) => (
-            <div
-              key={chain.id}
-              className="flex flex-col items-center p-4 bg-surface-800 rounded-lg"
-            >
-              <ChainAvatar chain={chain.id} size="md" className="mb-2" />
-              <p className="text-sm text-surface-300">{chain.name}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-surface-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">🔷</span>
+              <span className="font-medium text-surface-200">EVM Wallets</span>
             </div>
-          ))}
+            <p className="text-sm text-surface-400">
+              One address works across Ethereum, Arbitrum, Optimism, Base, Polygon, BSC, Avalanche
+            </p>
+            <p className="text-xs text-surface-500 mt-2">
+              MetaMask, Rainbow, Coinbase Wallet
+            </p>
+          </div>
+          <div className="p-4 bg-surface-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">☀️</span>
+              <span className="font-medium text-surface-200">Solana Wallets</span>
+            </div>
+            <p className="text-sm text-surface-400">
+              Solana blockchain with SPL tokens
+            </p>
+            <p className="text-xs text-surface-500 mt-2">
+              Phantom, Solflare, Backpack
+            </p>
+          </div>
+          <div className="p-4 bg-surface-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">💧</span>
+              <span className="font-medium text-surface-200">SUI Wallets</span>
+            </div>
+            <p className="text-sm text-surface-400">
+              SUI blockchain with Move-based tokens
+            </p>
+            <p className="text-xs text-surface-500 mt-2">
+              Sui Wallet, Suiet, Ethos
+            </p>
+          </div>
         </div>
       </Card>
+
+      {/* Chain Selector Modal */}
+      <ChainSelectorModal
+        isOpen={isChainSelectorOpen}
+        onClose={() => setIsChainSelectorOpen(false)}
+        onSelectChain={handleChainSelect}
+      />
 
       {/* Add Wallet Modal */}
       <Modal
@@ -521,24 +604,19 @@ export function WalletsPage() {
         )}
 
         <form onSubmit={handleAddWallet} className="space-y-4">
-          <Select
-            label="Chain"
-            value={newWalletChain}
-            onChange={(e) => setNewWalletChain(e.target.value as Chain)}
-            options={SUPPORTED_CHAINS.map((chain) => ({
-              value: chain.id,
-              label: chain.name,
-            }))}
-          />
-
-          <Input
-            label="Wallet Address"
-            value={newWalletAddress}
-            onChange={(e) => setNewWalletAddress(e.target.value)}
-            className="font-mono"
-            placeholder="0x..."
-            required
-          />
+          <div>
+            <Input
+              label="Wallet Address"
+              value={newWalletAddress}
+              onChange={(e) => setNewWalletAddress(e.target.value)}
+              className="font-mono"
+              placeholder="0x... (EVM) or Solana address"
+              required
+            />
+            <p className="text-xs text-surface-500 mt-1">
+              EVM addresses (0x...) will be tracked across all EVM chains automatically
+            </p>
+          </div>
 
           <Input
             label="Label (Optional)"
@@ -579,6 +657,13 @@ export function WalletsPage() {
         variant="danger"
         onConfirm={confirmRemoveWallet}
         onCancel={() => setWalletToRemove(null)}
+      />
+
+      {/* SUI Wallet Connect Modal */}
+      <SuiConnectModal
+        trigger={<span style={{ display: 'none' }} />}
+        open={isSuiModalOpen}
+        onOpenChange={setIsSuiModalOpen}
       />
     </div>
   );

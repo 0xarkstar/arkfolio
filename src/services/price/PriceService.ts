@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import axios from 'axios';
+import { httpWithRetry, HttpError, HttpErrorType } from '../utils/httpUtils';
 
 export interface PriceData {
   symbol: string;
@@ -215,15 +216,25 @@ class PriceService {
     await this.rateLimitWait();
 
     try {
-      const response = await axios.get<Record<string, CoinGeckoPrice>>(
-        `${this.apiBaseUrl}/simple/price`,
+      const responseData = await httpWithRetry(
+        async () => {
+          const response = await axios.get<Record<string, CoinGeckoPrice>>(
+            `${this.apiBaseUrl}/simple/price`,
+            {
+              params: {
+                ids: coinIds.join(','),
+                vs_currencies: 'usd,krw',
+                include_24hr_change: 'true',
+              },
+              timeout: 10000,
+            }
+          );
+          return response.data;
+        },
         {
-          params: {
-            ids: coinIds.join(','),
-            vs_currencies: 'usd,krw',
-            include_24hr_change: 'true',
-          },
-          timeout: 10000,
+          maxRetries: 3,
+          baseDelayMs: 2000,
+          maxDelayMs: 60000, // CoinGecko can have long rate limits
         }
       );
 
@@ -238,7 +249,7 @@ class PriceService {
         }
       });
 
-      for (const [coinId, priceData] of Object.entries(response.data)) {
+      for (const [coinId, priceData] of Object.entries(responseData)) {
         const symbol = idToSymbol.get(coinId);
         if (symbol) {
           result.set(symbol, {
@@ -251,7 +262,11 @@ class PriceService {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch prices from CoinGecko:', error);
+      if (error instanceof HttpError && error.type === HttpErrorType.RATE_LIMIT) {
+        console.warn(`CoinGecko rate limit hit. Retry after ${error.retryAfter}s`);
+      } else {
+        console.error('Failed to fetch prices from CoinGecko:', error);
+      }
       // Return empty result on error, cached data may still be used
     }
 

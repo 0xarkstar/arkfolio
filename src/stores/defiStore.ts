@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import { getDb, generateId } from '../database/init';
 import { defiPositions, points, wallets } from '../database/schema';
 import { eq } from 'drizzle-orm';
-import { zapperService } from '../services/defi';
+import { zapperService, costBasisService } from '../services/defi';
 
 export interface DefiPosition {
   id: string;
@@ -20,7 +20,14 @@ export interface DefiPosition {
   maturityDate: Date | null;
   healthFactor: number | null;
   chain: string;
+  entryDate: Date | null;
   updatedAt: Date;
+}
+
+export interface PositionPnL {
+  unrealizedPnL: Decimal;
+  unrealizedPnLPercent: number;
+  hasCostBasis: boolean;
 }
 
 export interface PointsBalance {
@@ -37,6 +44,7 @@ interface DefiState {
   pointsBalances: PointsBalance[];
   isLoading: boolean;
   isSyncing: boolean;
+  isCalculatingCostBasis: boolean;
   error: string | null;
   lastZapperSync: Date | null;
 
@@ -54,12 +62,19 @@ interface DefiState {
   syncFromZapper: () => Promise<void>;
   isZapperConfigured: () => boolean;
 
+  // Cost Basis
+  calculateCostBasisForPosition: (positionId: string, walletAddress: string) => Promise<void>;
+  calculateAllCostBasis: (walletAddress: string) => Promise<void>;
+
   // Getters
   getTotalValueUsd: () => Decimal;
+  getTotalCostBasisUsd: () => Decimal;
+  getTotalUnrealizedPnL: () => { pnl: Decimal; percent: number };
   getAverageApy: () => number;
   getPositionsByProtocol: (protocol: string) => DefiPosition[];
   getPositionsByType: (type: DefiPosition['positionType']) => DefiPosition[];
   getLowestHealthFactor: () => { position: DefiPosition; value: number } | null;
+  getPositionPnL: (positionId: string) => PositionPnL | null;
 }
 
 export const useDefiStore = create<DefiState>((set, get) => ({
@@ -67,6 +82,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
   pointsBalances: [],
   isLoading: false,
   isSyncing: false,
+  isCalculatingCostBasis: false,
   error: null,
   lastZapperSync: null,
 
@@ -95,7 +111,8 @@ export const useDefiStore = create<DefiState>((set, get) => ({
         apy: p.apy,
         maturityDate: p.maturityDate ? new Date(p.maturityDate as unknown as number) : null,
         healthFactor: p.healthFactor,
-        chain: 'ethereum', // Default, could be stored in DB
+        chain: (p as Record<string, unknown>).chain as string || 'Ethereum',
+        entryDate: (p as Record<string, unknown>).entryDate ? new Date((p as Record<string, unknown>).entryDate as number) : null,
         updatedAt: p.updatedAt ? new Date(p.updatedAt as unknown as number) : new Date(),
       }));
 
@@ -172,8 +189,10 @@ export const useDefiStore = create<DefiState>((set, get) => ({
     const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (updates.currentValueUsd) dbUpdates.currentValueUsd = updates.currentValueUsd.toNumber();
+    if (updates.costBasisUsd) dbUpdates.costBasisUsd = updates.costBasisUsd.toNumber();
     if (updates.apy !== undefined) dbUpdates.apy = updates.apy;
     if (updates.healthFactor !== undefined) dbUpdates.healthFactor = updates.healthFactor;
+    if (updates.entryDate !== undefined) dbUpdates.entryDate = updates.entryDate;
     if (updates.rewardsEarned) {
       dbUpdates.rewardsEarned = JSON.stringify(
         Object.fromEntries(
@@ -302,6 +321,7 @@ export const useDefiStore = create<DefiState>((set, get) => ({
           protocol: position.protocol,
           positionType: position.positionType,
           poolAddress: position.poolAddress,
+          chain: position.chain,
           assets: JSON.stringify(position.assets),
           amounts: JSON.stringify(position.amounts.map((a) => a.toString())),
           costBasisUsd: position.costBasisUsd.toNumber(),
@@ -314,11 +334,13 @@ export const useDefiStore = create<DefiState>((set, get) => ({
           apy: position.apy,
           maturityDate: position.maturityDate,
           healthFactor: position.healthFactor,
+          entryDate: position.entryDate,
           updatedAt: new Date(),
         }).onConflictDoUpdate({
           target: defiPositions.id,
           set: {
             currentValueUsd: position.currentValueUsd.toNumber(),
+            chain: position.chain,
             apy: position.apy,
             healthFactor: position.healthFactor,
             updatedAt: new Date(),
@@ -376,5 +398,114 @@ export const useDefiStore = create<DefiState>((set, get) => ({
     );
 
     return { position: lowest, value: lowest.healthFactor || 0 };
+  },
+
+  // Cost Basis Calculation
+  calculateCostBasisForPosition: async (positionId: string, walletAddress: string) => {
+    const { positions, updatePosition } = get();
+    const position = positions.find((p) => p.id === positionId);
+
+    if (!position) {
+      console.warn(`Position ${positionId} not found`);
+      return;
+    }
+
+    set({ isCalculatingCostBasis: true });
+
+    try {
+      const costBasisResult = await costBasisService.calculateCostBasis(position, walletAddress);
+
+      if (costBasisResult && costBasisResult.totalCostBasisUsd.greaterThan(0)) {
+        await updatePosition(positionId, {
+          costBasisUsd: costBasisResult.totalCostBasisUsd,
+          entryDate: costBasisResult.firstEntryDate,
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to calculate cost basis for position ${positionId}:`, error);
+    } finally {
+      set({ isCalculatingCostBasis: false });
+    }
+  },
+
+  calculateAllCostBasis: async (walletAddress: string) => {
+    const { positions, updatePosition } = get();
+
+    console.log(`\n========== STARTING COST BASIS CALCULATION ==========`);
+    console.log(`Wallet: ${walletAddress}`);
+    console.log(`Positions to process: ${positions.length}`);
+
+    set({ isCalculatingCostBasis: true });
+
+    try {
+      // Use real-time callback to update each position immediately
+      await costBasisService.calculateCostBasisBatch(
+        positions,
+        walletAddress,
+        (completed, total) => {
+          console.log(`Progress: ${completed}/${total} positions processed`);
+        },
+        // Real-time update callback - updates UI immediately when each position is calculated
+        async (positionId, costBasis) => {
+          console.log(`\n>>> CALLBACK: Position ${positionId}`);
+          console.log(`    Cost basis: $${costBasis.totalCostBasisUsd.toFixed(2)}`);
+          console.log(`    Entry date: ${costBasis.firstEntryDate?.toLocaleDateString() || 'N/A'}`);
+
+          if (costBasis.totalCostBasisUsd.greaterThan(0)) {
+            console.log(`    -> Updating position in store...`);
+            await updatePosition(positionId, {
+              costBasisUsd: costBasis.totalCostBasisUsd,
+              entryDate: costBasis.firstEntryDate,
+            });
+            console.log(`    -> Position updated!`);
+          } else {
+            console.log(`    -> Skipped (cost basis is 0)`);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Failed to calculate cost basis:', error);
+    } finally {
+      set({ isCalculatingCostBasis: false });
+      console.log(`\n========== COST BASIS CALCULATION COMPLETE ==========\n`);
+    }
+  },
+
+  // P&L Getters
+  getTotalCostBasisUsd: () => {
+    const { positions } = get();
+    return positions.reduce((sum, p) => sum.plus(p.costBasisUsd), new Decimal(0));
+  },
+
+  getTotalUnrealizedPnL: () => {
+    const { positions } = get();
+    const totalValue = positions.reduce((sum, p) => sum.plus(p.currentValueUsd), new Decimal(0));
+    const totalCost = positions.reduce((sum, p) => sum.plus(p.costBasisUsd), new Decimal(0));
+
+    const pnl = totalValue.minus(totalCost);
+    const percent = totalCost.greaterThan(0)
+      ? pnl.dividedBy(totalCost).times(100).toNumber()
+      : 0;
+
+    return { pnl, percent };
+  },
+
+  getPositionPnL: (positionId: string) => {
+    const { positions } = get();
+    const position = positions.find((p) => p.id === positionId);
+
+    if (!position) return null;
+
+    const hasCostBasis = position.costBasisUsd.greaterThan(0);
+    const unrealizedPnL = position.currentValueUsd.minus(position.costBasisUsd);
+    const unrealizedPnLPercent = hasCostBasis
+      ? unrealizedPnL.dividedBy(position.costBasisUsd).times(100).toNumber()
+      : 0;
+
+    return {
+      unrealizedPnL,
+      unrealizedPnLPercent,
+      hasCostBasis,
+    };
   },
 }));

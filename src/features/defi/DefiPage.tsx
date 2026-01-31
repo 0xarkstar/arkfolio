@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDefiStore, DefiPosition } from '../../stores/defiStore';
+import { useWalletsStore } from '../../stores/walletsStore';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Card } from '../../components/Card';
@@ -9,7 +10,7 @@ import { Select, Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
 import { Alert } from '../../components/Alert';
 import { Modal, ModalFooter } from '../../components/Modal';
-import { SkeletonCard } from '../../components/Skeleton';
+import { SkeletonCard, SectionLoading } from '../../components/Skeleton';
 import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 import Decimal from 'decimal.js';
 
@@ -33,6 +34,7 @@ const mockPositions: DefiPosition[] = [
     maturityDate: null,
     healthFactor: null,
     chain: 'Ethereum',
+    entryDate: new Date('2024-01-15'),
     updatedAt: new Date(),
   },
   {
@@ -50,6 +52,7 @@ const mockPositions: DefiPosition[] = [
     maturityDate: null,
     healthFactor: 2.8,
     chain: 'Arbitrum',
+    entryDate: new Date('2024-02-20'),
     updatedAt: new Date(),
   },
   {
@@ -67,6 +70,7 @@ const mockPositions: DefiPosition[] = [
     maturityDate: new Date('2024-12-26'),
     healthFactor: null,
     chain: 'Ethereum',
+    entryDate: new Date('2024-03-10'),
     updatedAt: new Date(),
   },
   {
@@ -84,6 +88,7 @@ const mockPositions: DefiPosition[] = [
     maturityDate: null,
     healthFactor: null,
     chain: 'Ethereum',
+    entryDate: new Date('2024-04-01'),
     updatedAt: new Date(),
   },
   {
@@ -101,6 +106,7 @@ const mockPositions: DefiPosition[] = [
     maturityDate: null,
     healthFactor: null,
     chain: 'Base',
+    entryDate: new Date('2024-05-15'),
     updatedAt: new Date(),
   },
 ];
@@ -139,18 +145,25 @@ export function DefiPage() {
     pointsBalances: storePoints,
     isLoading,
     isSyncing,
+    isCalculatingCostBasis,
     lastZapperSync,
     loadPositions,
     loadPoints,
     getTotalValueUsd,
+    getTotalCostBasisUsd,
+    getTotalUnrealizedPnL,
     getAverageApy,
     getLowestHealthFactor,
+    getPositionPnL,
     addPosition,
     removePosition,
     addPoints,
     syncFromZapper,
+    calculateAllCostBasis,
     isZapperConfigured,
   } = useDefiStore();
+
+  const { wallets: storedWallets, loadWallets } = useWalletsStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPointsModal, setShowPointsModal] = useState(false);
@@ -236,6 +249,7 @@ export function DefiPage() {
         maturityDate: null,
         healthFactor,
         chain: formChain,
+        entryDate: null,
       });
 
       toast.success(`Added ${formProtocol} position`);
@@ -302,7 +316,8 @@ export function DefiPage() {
   useEffect(() => {
     loadPositions();
     loadPoints();
-  }, [loadPositions, loadPoints]);
+    loadWallets();
+  }, [loadPositions, loadPoints, loadWallets]);
 
   const handleSyncFromZapper = async () => {
     try {
@@ -310,6 +325,39 @@ export function DefiPage() {
       toast.success('DeFi positions synced successfully');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync positions';
+      toast.error(message);
+    }
+  };
+
+  const handleCalculateCostBasis = async () => {
+    // Get unique wallet IDs from positions (excluding manual entries)
+    const positionWalletIds = [...new Set(storePositions.map(p => p.walletId).filter(id => id !== 'manual'))];
+    if (positionWalletIds.length === 0) {
+      toast.error('No wallet addresses found. Sync positions first.');
+      return;
+    }
+
+    // Map wallet IDs to actual addresses
+    const walletAddresses = positionWalletIds
+      .map(walletId => {
+        const wallet = storedWallets.find(w => w.id === walletId);
+        return wallet?.address;
+      })
+      .filter((addr): addr is string => !!addr);
+
+    if (walletAddresses.length === 0) {
+      toast.error('Could not find wallet addresses. Please sync wallets first.');
+      return;
+    }
+
+    try {
+      toast.info('Calculating cost basis from Zapper transaction history...');
+      for (const address of walletAddresses) {
+        await calculateAllCostBasis(address);
+      }
+      toast.success('Cost basis calculated successfully');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to calculate cost basis';
       toast.error(message);
     }
   };
@@ -512,8 +560,25 @@ export function DefiPage() {
               </p>
             </Card>
             <Card className="p-4">
-              <p className="text-sm text-surface-400">Active Positions</p>
-              <p className="text-2xl font-bold text-surface-100">{positions.length}</p>
+              <p className="text-sm text-surface-400">Unrealized P&L</p>
+              {(() => {
+                const { pnl, percent } = getTotalUnrealizedPnL();
+                const hasCostBasis = getTotalCostBasisUsd().greaterThan(0);
+                if (!hasCostBasis) {
+                  return <p className="text-2xl font-bold text-surface-500">-</p>;
+                }
+                const isProfit = pnl.greaterThanOrEqualTo(0);
+                return (
+                  <div>
+                    <p className={`text-2xl font-bold font-tabular ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                      {isProfit ? '+' : ''}{formatCurrency(pnl)}
+                    </p>
+                    <p className={`text-xs ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                      {isProfit ? '+' : ''}{percent.toFixed(2)}%
+                    </p>
+                  </div>
+                );
+              })()}
             </Card>
             <Card className="p-4">
               <p className="text-sm text-surface-400">Avg. APY</p>
@@ -522,9 +587,9 @@ export function DefiPage() {
               </p>
             </Card>
             <Card className="p-4">
-              <p className="text-sm text-surface-400">Protocols</p>
+              <p className="text-sm text-surface-400">Positions / Protocols</p>
               <p className="text-2xl font-bold text-surface-100">
-                {new Set(positions.map((p) => p.protocol)).size}
+                {positions.length} / {new Set(positions.map((p) => p.protocol)).size}
               </p>
             </Card>
           </>
@@ -585,6 +650,18 @@ export function DefiPage() {
                 {isSyncing ? 'Syncing...' : 'Sync from Zapper'}
               </Button>
             )}
+            {storePositions.length > 0 && (
+              <Button
+                onClick={handleCalculateCostBasis}
+                variant="secondary"
+                size="sm"
+                loading={isCalculatingCostBasis}
+                disabled={isCalculatingCostBasis}
+                title="Calculate cost basis from transaction history"
+              >
+                {isCalculatingCostBasis ? 'Calculating...' : 'Calculate Cost Basis'}
+              </Button>
+            )}
             <Button
               onClick={() => setShowAddModal(true)}
               variant="secondary"
@@ -603,9 +680,7 @@ export function DefiPage() {
         )}
 
         {isLoading || isSyncing ? (
-          <div className="text-center py-12">
-            <div className="text-surface-400">Loading positions...</div>
-          </div>
+          <SectionLoading message="Loading positions..." />
         ) : positions.length === 0 ? (
           <NoDataEmptyState onAction={() => setShowAddModal(true)} />
         ) : filteredAndSortedPositions.length === 0 ? (
@@ -646,6 +721,9 @@ export function DefiPage() {
                   >
                     Value<SortIcon field="value" />
                   </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-surface-400">
+                    P&L
+                  </th>
                   <th
                     className="text-right py-3 px-4 text-sm font-medium text-surface-400 cursor-pointer hover:text-surface-200"
                     onClick={() => handleSort('apy')}
@@ -683,8 +761,27 @@ export function DefiPage() {
                     <td className="py-3 px-4 text-right font-tabular text-surface-100">
                       {formatCurrency(position.currentValueUsd)}
                     </td>
+                    <td className="py-3 px-4 text-right font-tabular">
+                      {(() => {
+                        const pnl = getPositionPnL(position.id);
+                        if (!pnl || !pnl.hasCostBasis) {
+                          return <span className="text-surface-500">-</span>;
+                        }
+                        const isProfit = pnl.unrealizedPnL.greaterThanOrEqualTo(0);
+                        return (
+                          <div>
+                            <span className={isProfit ? 'text-profit' : 'text-loss'}>
+                              {isProfit ? '+' : ''}{formatCurrency(pnl.unrealizedPnL)}
+                            </span>
+                            <span className={`text-xs ml-1 ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                              ({isProfit ? '+' : ''}{pnl.unrealizedPnLPercent.toFixed(1)}%)
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="py-3 px-4 text-right font-tabular text-profit">
-                      {position.apy && position.apy > 0 ? `${position.apy}%` : '-'}
+                      {position.apy && position.apy > 0 ? `${position.apy.toFixed(2)}%` : '-'}
                     </td>
                     <td className="py-3 px-4 text-right">
                       {position.healthFactor ? (

@@ -1,5 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+export interface HttpRequestOptions {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: string;
+  timeout?: number;
+}
+
+export interface HttpResponse {
+  status: number;
+  statusText: string;
+  data: unknown;
+  headers: Record<string, string>;
+}
+
 export interface ElectronAPI {
   safeStorage: {
     isAvailable: () => Promise<boolean>;
@@ -12,6 +27,10 @@ export interface ElectronAPI {
     getVersion: () => Promise<string>;
     getPlatform: () => Promise<NodeJS.Platform>;
     getPath: (name: string) => Promise<string>;
+  };
+  // Network API for making HTTP requests from main process (bypasses CORS)
+  net: {
+    request: (options: HttpRequestOptions) => Promise<HttpResponse>;
   };
 }
 
@@ -27,6 +46,9 @@ const electronAPI: ElectronAPI = {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
     getPath: (name: string) => ipcRenderer.invoke('app:getPath', name),
+  },
+  net: {
+    request: (options: HttpRequestOptions) => ipcRenderer.invoke('net:request', options),
   },
 };
 

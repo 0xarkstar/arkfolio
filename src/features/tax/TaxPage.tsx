@@ -8,7 +8,7 @@ import { SearchInput } from '../../components/SearchInput';
 import { Select } from '../../components/Input';
 import { Badge } from '../../components/Badge';
 import { Alert } from '../../components/Alert';
-import { SkeletonCard } from '../../components/Skeleton';
+import { SkeletonCard, SectionLoading } from '../../components/Skeleton';
 import { NoDataEmptyState, NoResultsEmptyState } from '../../components/EmptyState';
 import Decimal from 'decimal.js';
 
@@ -372,9 +372,7 @@ export function TaxPage() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="text-surface-400">Calculating tax...</div>
-          </div>
+          <SectionLoading message="Calculating tax..." />
         ) : displaySummary.totalTransactions === 0 ? (
           <NoDataEmptyState
             onAction={() => {}}

@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
+import { snapshotService, SnapshotPeriod, PortfolioDataPoint } from '../../services/portfolio/SnapshotService';
 
 interface PortfolioChartProps {
   data?: { time: string; value: number }[];
   height?: number;
   showTooltip?: boolean;
+  currentValue?: number; // Current portfolio value for real-time display
 }
 
 type Period = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
 
-// Generate mock data for demonstration
-function generateMockData(period: Period): { time: string; value: number }[] {
+// Generate mock data when no real data is available
+function generateMockData(period: Period, baseValue: number = 100000): { time: string; value: number }[] {
   const data: { time: string; value: number }[] = [];
   const now = new Date();
   let days: number;
@@ -47,17 +49,22 @@ function generateMockData(period: Period): { time: string; value: number }[] {
   }
 
   const totalPoints = Math.floor((days * 24) / interval);
-  let value = 100000 + Math.random() * 50000;
+  let value = baseValue * 0.8 + Math.random() * baseValue * 0.4;
 
   for (let i = totalPoints; i >= 0; i--) {
     const date = new Date(now.getTime() - i * interval * 60 * 60 * 1000);
     const change = (Math.random() - 0.48) * value * 0.02;
-    value = Math.max(value + change, 10000);
+    value = Math.max(value + change, baseValue * 0.5);
 
     data.push({
       time: date.toISOString().split('T')[0],
       value: Math.round(value * 100) / 100,
     });
+  }
+
+  // Make the last point match the current value
+  if (data.length > 0) {
+    data[data.length - 1].value = baseValue;
   }
 
   // Remove duplicates by time
@@ -72,14 +79,32 @@ function generateMockData(period: Period): { time: string; value: number }[] {
   return uniqueData;
 }
 
-export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioChartProps) {
+export function PortfolioChart({ height = 300, showTooltip = true, currentValue: propCurrentValue }: PortfolioChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('1M');
-  const [currentValue, setCurrentValue] = useState<number | null>(null);
+  const [displayValue, setDisplayValue] = useState<number | null>(null);
   const [changePercent, setChangePercent] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasRealData, setHasRealData] = useState(false);
+
+  // Fetch data from snapshot service
+  const fetchChartData = useCallback(async (period: Period): Promise<PortfolioDataPoint[]> => {
+    try {
+      const snapshots = await snapshotService.getSnapshots(period as SnapshotPeriod);
+      if (snapshots.length > 0) {
+        setHasRealData(true);
+        return snapshots;
+      }
+    } catch (error) {
+      console.error('Failed to fetch snapshots:', error);
+    }
+
+    // Fall back to mock data
+    setHasRealData(false);
+    return generateMockData(period, propCurrentValue || 100000);
+  }, [propCurrentValue]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -160,7 +185,7 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
       chart.subscribeCrosshairMove((param) => {
         if (param.time && param.seriesData.get(series)) {
           const data = param.seriesData.get(series) as LineData;
-          setCurrentValue(data.value as number);
+          setDisplayValue(data.value as number);
         }
       });
     }
@@ -177,9 +202,8 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
 
     setIsLoading(true);
 
-    // Simulate data loading delay for UX
-    const timer = setTimeout(() => {
-      const data = generateMockData(selectedPeriod);
+    const loadData = async () => {
+      const data = await fetchChartData(selectedPeriod);
       const chartData: LineData[] = data.map(d => ({
         time: d.time as Time,
         value: d.value,
@@ -191,9 +215,12 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
       if (data.length >= 2) {
         const startValue = data[0].value;
         const endValue = data[data.length - 1].value;
-        const change = ((endValue - startValue) / startValue) * 100;
+        const change = startValue > 0 ? ((endValue - startValue) / startValue) * 100 : 0;
         setChangePercent(change);
-        setCurrentValue(endValue);
+        setDisplayValue(endValue);
+      } else if (propCurrentValue) {
+        setDisplayValue(propCurrentValue);
+        setChangePercent(0);
       }
 
       // Fit content
@@ -202,10 +229,10 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
       }
 
       setIsLoading(false);
-    }, 150);
+    };
 
-    return () => clearTimeout(timer);
-  }, [selectedPeriod]);
+    loadData();
+  }, [selectedPeriod, fetchChartData, propCurrentValue]);
 
   const periods: Period[] = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
   const isPositive = changePercent >= 0;
@@ -219,14 +246,17 @@ export function PortfolioChart({ height = 300, showTooltip = true }: PortfolioCh
               <div className="h-8 w-32 bg-surface-700 rounded" />
               <div className="h-5 w-16 bg-surface-700 rounded" />
             </div>
-          ) : currentValue !== null ? (
+          ) : displayValue !== null ? (
             <div className="flex items-baseline gap-3">
               <span className="text-2xl font-bold text-surface-100 font-tabular">
-                ${currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span className={`text-sm font-medium ${isPositive ? 'text-profit' : 'text-loss'}`}>
                 {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
               </span>
+              {!hasRealData && (
+                <span className="text-xs text-surface-500">(simulated)</span>
+              )}
             </div>
           ) : null}
         </div>

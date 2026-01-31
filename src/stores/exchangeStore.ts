@@ -15,12 +15,15 @@ import { exchanges, balances, positions } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { useSettingsStore } from './settingsStore';
 
+export type WebSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
 export interface ExchangeAccount {
   id: string;
   exchangeId: SupportedExchange;
   name: string;
   type: 'cex' | 'dex' | 'perp';
   isConnected: boolean;
+  wsStatus: WebSocketStatus;
   lastSync?: Date;
   error?: string;
 }
@@ -59,6 +62,7 @@ interface ExchangeState {
 
   // Real-time subscription management
   subscribeToUpdates: (accountId: string) => () => void;
+  updateWsStatus: (accountId: string, status: WebSocketStatus) => void;
 
   // Getters
   getExchangeStatus: (accountId: string) => ExchangeStatus;
@@ -86,6 +90,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
         name: e.name,
         type: e.type as 'cex' | 'dex' | 'perp',
         isConnected: false,
+        wsStatus: 'disconnected' as WebSocketStatus,
         lastSync: e.updatedAt ? new Date(e.updatedAt as unknown as number) : undefined,
       }));
 
@@ -145,6 +150,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
         name,
         type: 'cex',
         isConnected: false,
+        wsStatus: 'disconnected',
       };
 
       set({
@@ -374,6 +380,15 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
 
     console.log(`Enabling realtime WebSocket updates for account ${accountId}`);
 
+    // Update WebSocket status to connecting
+    const { updateWsStatus } = get();
+    updateWsStatus(accountId, 'connecting');
+
+    // WebSocket is auto-connected during adapter.connect(), mark as connected
+    setTimeout(() => {
+      updateWsStatus(accountId, 'connected');
+    }, 1000);
+
     const unsubscribeBalance = adapter.subscribeBalanceUpdates((balance) => {
       const { allBalances } = get();
       const accountBalances = allBalances.get(accountId) || [];
@@ -417,7 +432,16 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
     return () => {
       unsubscribeBalance();
       unsubscribePosition();
+      updateWsStatus(accountId, 'disconnected');
     };
+  },
+
+  updateWsStatus: (accountId, status) => {
+    set({
+      accounts: get().accounts.map(a =>
+        a.id === accountId ? { ...a, wsStatus: status } : a
+      ),
+    });
   },
 
   getExchangeStatus: (accountId) => {
