@@ -7,6 +7,7 @@ import { useWalletsStore } from '../../stores/walletsStore';
 import { GlobalSearch } from '../GlobalSearch';
 import { toast } from '../Toast';
 import { Button } from '../Button';
+import { NotificationBell } from '../NotificationPanel';
 
 const viewTitles: Record<ViewId, string> = {
   dashboard: 'Dashboard',
@@ -16,6 +17,8 @@ const viewTitles: Record<ViewId, string> = {
   defi: 'DeFi Positions',
   risk: 'Risk Management',
   tax: 'Tax Report',
+  history: 'Transaction History',
+  alerts: 'Price Alerts',
   settings: 'Settings',
 };
 
@@ -91,6 +94,7 @@ export default function Header() {
 
       <div className="flex items-center gap-4">
         <GlobalSearch />
+        <NotificationBell />
 
         {settings.autoSync && (
           <div className="flex items-center gap-1.5 text-xs text-surface-500">

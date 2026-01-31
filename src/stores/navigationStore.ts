@@ -8,6 +8,8 @@ export type ViewId =
   | 'defi'
   | 'risk'
   | 'tax'
+  | 'history'
+  | 'alerts'
   | 'settings';
 
 interface NavigationState {

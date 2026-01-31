@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { usePortfolioStore } from '../../stores/portfolioStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
-import { PortfolioChart } from '../../components/charts';
+import { useWalletsStore } from '../../stores/walletsStore';
+import { useDefiStore } from '../../stores/defiStore';
+import { PortfolioChart, AssetAllocationChart, CategoryAllocationChart, PerformanceStats } from '../../components/charts';
 import { toast } from '../../components/Toast';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -15,12 +17,19 @@ type SortField = 'value' | 'change' | 'name' | 'amount';
 type SortDirection = 'asc' | 'desc';
 
 export function PortfolioPage() {
-  const { summary, holdings, allocations, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
+  const { summary, holdings, isLoading, lastRefresh, refreshPortfolio } = usePortfolioStore();
   const { accounts } = useExchangeStore();
+  const { getTotalValueUsd: getWalletsTotalValue } = useWalletsStore();
+  const { getTotalValueUsd: getDefiTotalValue } = useDefiStore();
   const [showAllHoldings, setShowAllHoldings] = useState(false);
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Calculate category values
+  const cexValue = summary.totalValueUsd.toNumber();
+  const walletsValue = getWalletsTotalValue().toNumber();
+  const defiValue = getDefiTotalValue().toNumber();
 
   // Refresh portfolio on mount and when accounts change
   useEffect(() => {
@@ -192,43 +201,51 @@ export function PortfolioPage() {
         </Card>
       )}
 
+      {/* Portfolio Distribution (CEX / On-chain / DeFi) */}
+      {(cexValue > 0 || walletsValue > 0 || defiValue > 0) && (
+        <Card className="p-6">
+          <CategoryAllocationChart
+            cexValue={cexValue}
+            onchainValue={walletsValue}
+            defiValue={defiValue}
+          />
+        </Card>
+      )}
+
       {/* Asset Allocation */}
       {hasData && (
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-surface-100 mb-4">Asset Allocation</h2>
+          <AssetAllocationChart
+            data={holdings.map((h, i) => ({
+              label: h.symbol,
+              value: h.valueUsd.toNumber(),
+              color: getAllocationColor(i),
+            }))}
+            title="Asset Allocation"
+          />
+        </Card>
+      )}
 
-          {/* Progress bar */}
-          <div className="h-4 rounded-full overflow-hidden flex mb-4">
-            {allocations.map((allocation) => (
-              <div
-                key={allocation.category}
-                className={`${allocation.color} transition-all`}
-                style={{ width: `${allocation.percent}%` }}
-                title={`${allocation.category}: ${allocation.percent.toFixed(1)}%`}
-              />
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {allocations.map((allocation) => (
-              <div key={allocation.category} className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${allocation.color}`} />
-                <div>
-                  <p className="text-sm font-medium text-surface-100">{allocation.category}</p>
-                  <p className="text-xs text-surface-400">
-                    {formatCurrency(allocation.value.toNumber())} ({allocation.percent.toFixed(1)}%)
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Performance Stats */}
+      {hasData && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-surface-100 mb-4">Performance Summary</h3>
+          <PerformanceStats
+            totalReturn={summary.change24hUsd.toNumber() * 30} // Approximate monthly (placeholder)
+            totalReturnPercent={summary.change24hPercent * 30}
+            dayReturn={summary.change24hUsd.toNumber()}
+            dayReturnPercent={summary.change24hPercent}
+            weekReturn={summary.change24hUsd.toNumber() * 7}
+            weekReturnPercent={summary.change24hPercent * 7}
+            monthReturn={summary.change24hUsd.toNumber() * 30}
+            monthReturnPercent={summary.change24hPercent * 30}
+          />
         </Card>
       )}
 
       {/* Performance Chart */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-surface-100 mb-4">Performance</h2>
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Historical Performance</h2>
         <PortfolioChart height={300} />
       </Card>
 
@@ -384,4 +401,21 @@ function formatAmount(value: number): string {
     return value.toFixed(6);
   }
   return value.toFixed(8);
+}
+
+const ALLOCATION_COLORS = [
+  '#7c3aed', // Purple
+  '#06b6d4', // Cyan
+  '#f59e0b', // Amber
+  '#10b981', // Emerald
+  '#ef4444', // Red
+  '#8b5cf6', // Violet
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#f97316', // Orange
+  '#6366f1', // Indigo
+];
+
+function getAllocationColor(index: number): string {
+  return ALLOCATION_COLORS[index % ALLOCATION_COLORS.length];
 }
