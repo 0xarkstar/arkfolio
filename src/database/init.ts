@@ -186,6 +186,7 @@ async function createTables(): Promise<void> {
       protocol TEXT NOT NULL,
       position_type TEXT,
       pool_address TEXT,
+      chain TEXT DEFAULT 'Ethereum',
       assets TEXT,
       amounts TEXT,
       cost_basis_usd REAL,
@@ -194,6 +195,7 @@ async function createTables(): Promise<void> {
       apy REAL,
       maturity_date INTEGER,
       health_factor REAL,
+      entry_date INTEGER,
       updated_at INTEGER
     );
 
@@ -252,6 +254,33 @@ async function createTables(): Promise<void> {
     if (statement.trim()) {
       db.run(statement);
     }
+  }
+
+  // Run migrations for existing databases
+  await runMigrations();
+}
+
+// Run database migrations
+async function runMigrations(): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
+  // Migration: Add chain and entry_date columns to defi_positions
+  try {
+    // Check if chain column exists
+    const tableInfo = db.exec("PRAGMA table_info(defi_positions)");
+    const columns = tableInfo[0]?.values?.map(row => row[1]) || [];
+
+    if (!columns.includes('chain')) {
+      console.log('Migration: Adding chain column to defi_positions');
+      db.run("ALTER TABLE defi_positions ADD COLUMN chain TEXT DEFAULT 'Ethereum'");
+    }
+
+    if (!columns.includes('entry_date')) {
+      console.log('Migration: Adding entry_date column to defi_positions');
+      db.run("ALTER TABLE defi_positions ADD COLUMN entry_date INTEGER");
+    }
+  } catch (error) {
+    console.error('Migration error:', error);
   }
 }
 

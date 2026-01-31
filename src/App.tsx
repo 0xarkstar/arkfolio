@@ -13,9 +13,12 @@ import { DefiPage } from './features/defi';
 import { RiskPage } from './features/risk';
 import { TaxPage } from './features/tax';
 import { SettingsPage } from './features/settings';
+import { AlertsPage } from './features/alerts/AlertsPage';
+import { HistoryPage } from './features/history/HistoryPage';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KeyboardShortcuts, useKeyboardNavigation } from './components/KeyboardShortcuts';
+import { Onboarding, useOnboarding } from './components/Onboarding';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
 
@@ -25,6 +28,7 @@ function App() {
   const { setDbReady } = useAppStore();
   const { currentView } = useNavigationStore();
   const { loadSettings } = useSettingsStore();
+  const { showOnboarding, isChecking, completeOnboarding } = useOnboarding();
 
   // Initialize database and load settings
   useEffect(() => {
@@ -50,7 +54,7 @@ function App() {
   // Enable keyboard navigation
   useKeyboardNavigation();
 
-  if (isLoading) {
+  if (isLoading || isChecking) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface-950">
         <div className="text-center">
@@ -81,6 +85,7 @@ function App() {
 
   return (
     <>
+      {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
       <MainLayout>
         <ErrorBoundary>
           <PageRouter currentView={currentView} />
@@ -108,6 +113,10 @@ function PageRouter({ currentView }: { currentView: ViewId }) {
       return <RiskPage />;
     case 'tax':
       return <TaxPage />;
+    case 'history':
+      return <HistoryPage />;
+    case 'alerts':
+      return <AlertsPage />;
     case 'settings':
       return <SettingsPage />;
     default:

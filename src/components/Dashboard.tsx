@@ -5,6 +5,7 @@ import { usePortfolioStore } from '../stores/portfolioStore';
 import { useWalletsStore } from '../stores/walletsStore';
 import { useDefiStore } from '../stores/defiStore';
 import { priceService } from '../services/price';
+import { snapshotService } from '../services/portfolio/SnapshotService';
 import { toast } from './Toast';
 import Decimal from 'decimal.js';
 import { Watchlist } from './Watchlist';
@@ -13,6 +14,8 @@ import { Button } from './Button';
 import { Alert } from './Alert';
 import { AssetAvatar } from './Avatar';
 import { SkeletonCard } from './Skeleton';
+import { PortfolioChart, CategoryAllocationChart } from './charts';
+import { useRefreshShortcut } from './KeyboardShortcuts';
 
 interface MarketPrice {
   symbol: string;
@@ -103,6 +106,18 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Full refresh function
+  const handleFullRefresh = useCallback(() => {
+    refreshPortfolio();
+    loadWallets();
+    loadDefiPositions();
+    fetchPrices(true);
+    toast.info('Refreshing dashboard...');
+  }, [refreshPortfolio, loadWallets, loadDefiPositions, fetchPrices]);
+
+  // Register keyboard shortcut for refresh (R key)
+  useRefreshShortcut(handleFullRefresh);
+
   useEffect(() => {
     fetchPrices();
 
@@ -122,6 +137,25 @@ export default function Dashboard() {
   const walletsValue = getWalletsTotalValue();
   const defiValue = getDefiTotalValue();
   const totalPortfolioValue = cexValue.plus(walletsValue).plus(defiValue);
+
+  // Save portfolio snapshot when values change (once per day)
+  useEffect(() => {
+    const saveSnapshotIfNeeded = async () => {
+      if (totalPortfolioValue.greaterThan(0)) {
+        const shouldSave = await snapshotService.shouldTakeSnapshot();
+        if (shouldSave) {
+          await snapshotService.saveSnapshot({
+            totalValueUsd: totalPortfolioValue,
+            cexValueUsd: cexValue,
+            onchainValueUsd: walletsValue,
+            defiValueUsd: defiValue,
+          });
+        }
+      }
+    };
+
+    saveSnapshotIfNeeded();
+  }, [totalPortfolioValue, cexValue, walletsValue, defiValue]);
 
   // Calculate risk metrics
   const hasOpenPositions = totalPositions > 0;
@@ -169,6 +203,16 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Portfolio Chart */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-surface-100 mb-4">Portfolio Performance</h2>
+        <PortfolioChart
+          height={280}
+          showTooltip={true}
+          currentValue={totalPortfolioValue.toNumber()}
+        />
+      </Card>
+
       {/* Risk Alert Banner */}
       {(hasOpenPositions || (lowestHealthFactor < 2 && lowestHealthFactor !== Infinity)) && (
         <Alert
@@ -211,36 +255,20 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Portfolio Breakdown */}
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-surface-100 mb-4">Portfolio Breakdown</h2>
           {totalPortfolioValue.greaterThan(0) ? (
-            <div className="space-y-4">
-              <BreakdownItem
-                label="CEX Holdings"
-                value={cexValue}
-                total={totalPortfolioValue}
-                color="bg-primary-500"
-                onClick={() => setView('exchanges')}
-              />
-              <BreakdownItem
-                label="On-chain Wallets"
-                value={walletsValue}
-                total={totalPortfolioValue}
-                color="bg-gain"
-                onClick={() => setView('wallets')}
-              />
-              <BreakdownItem
-                label="DeFi Positions"
-                value={defiValue}
-                total={totalPortfolioValue}
-                color="bg-blue-500"
-                onClick={() => setView('defi')}
-              />
-            </div>
+            <CategoryAllocationChart
+              cexValue={cexValue.toNumber()}
+              onchainValue={walletsValue.toNumber()}
+              defiValue={defiValue.toNumber()}
+            />
           ) : (
-            <div className="text-center py-8 text-surface-500">
-              <p>No assets tracked yet</p>
-              <p className="text-sm mt-1">Connect an exchange or add a wallet</p>
-            </div>
+            <>
+              <h2 className="text-lg font-semibold text-surface-100 mb-4">Portfolio Distribution</h2>
+              <div className="text-center py-8 text-surface-500">
+                <p>No assets tracked yet</p>
+                <p className="text-sm mt-1">Connect an exchange or add a wallet</p>
+              </div>
+            </>
           )}
         </Card>
 
@@ -411,46 +439,6 @@ function ActionCard({ title, description, action, onClick }: ActionCardProps) {
       <Button onClick={onClick} size="sm" fullWidth>
         {action}
       </Button>
-    </div>
-  );
-}
-
-interface BreakdownItemProps {
-  label: string;
-  value: Decimal;
-  total: Decimal;
-  color: string;
-  onClick?: () => void;
-}
-
-function BreakdownItem({ label, value, total, color, onClick }: BreakdownItemProps) {
-  const percent = total.greaterThan(0) ? value.div(total).times(100).toNumber() : 0;
-
-  return (
-    <div
-      className={`${onClick ? 'cursor-pointer hover:bg-surface-800/30 rounded-lg p-2 -m-2 transition-colors' : ''}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${color}`} />
-          <span className="text-surface-300">{label}</span>
-        </div>
-        <div className="text-right">
-          <span className="font-medium text-surface-100 font-tabular">
-            {formatCurrency(value.toNumber())}
-          </span>
-          <span className="text-surface-500 text-sm ml-2">
-            ({percent.toFixed(1)}%)
-          </span>
-        </div>
-      </div>
-      <div className="h-2 bg-surface-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} transition-all`}
-          style={{ width: `${Math.max(percent, 1)}%` }}
-        />
-      </div>
     </div>
   );
 }

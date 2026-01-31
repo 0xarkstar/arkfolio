@@ -91,6 +91,7 @@ export const defiPositions = sqliteTable('defi_positions', {
   protocol: text('protocol').notNull(), // uniswap, aave, morpho, pendle, eigenlayer, etc.
   positionType: text('position_type'), // lp, lending, borrowing, staking, vault, pt, yt
   poolAddress: text('pool_address'),
+  chain: text('chain').default('Ethereum'), // Ethereum, Arbitrum, Optimism, Base, Polygon, BSC, Avalanche
   assets: text('assets'), // JSON array of asset symbols
   amounts: text('amounts'), // JSON array of amounts
   costBasisUsd: real('cost_basis_usd'),
@@ -99,6 +100,7 @@ export const defiPositions = sqliteTable('defi_positions', {
   apy: real('apy'),
   maturityDate: integer('maturity_date', { mode: 'timestamp' }), // For Pendle PT/YT
   healthFactor: real('health_factor'), // For lending positions
+  entryDate: integer('entry_date', { mode: 'timestamp' }), // When position was opened
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
@@ -122,6 +124,19 @@ export const priceHistory = sqliteTable('price_history', {
   pk: primaryKey({ columns: [table.asset, table.timestamp] }),
 }));
 
+// Portfolio Snapshots (for historical chart)
+export const portfolioSnapshots = sqliteTable('portfolio_snapshots', {
+  id: text('id').primaryKey(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  totalValueUsd: real('total_value_usd').notNull(),
+  cexValueUsd: real('cex_value_usd').default(0),
+  onchainValueUsd: real('onchain_value_usd').default(0),
+  defiValueUsd: real('defi_value_usd').default(0),
+  // Store breakdown as JSON for detailed analysis
+  breakdown: text('breakdown'), // JSON: { holdings: { symbol: value }[] }
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
 // Tax Reports
 export const taxReports = sqliteTable('tax_reports', {
   id: text('id').primaryKey(),
@@ -140,6 +155,44 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value'),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// Price Alerts
+export const priceAlerts = sqliteTable('price_alerts', {
+  id: text('id').primaryKey(),
+  asset: text('asset').notNull(),
+  targetPrice: real('target_price').notNull(),
+  condition: text('condition', { enum: ['above', 'below'] }).notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  isTriggered: integer('is_triggered', { mode: 'boolean' }).default(false),
+  triggeredAt: integer('triggered_at', { mode: 'timestamp' }),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// Liquidation Alerts
+export const liquidationAlerts = sqliteTable('liquidation_alerts', {
+  id: text('id').primaryKey(),
+  positionId: text('position_id').references(() => positions.id, { onDelete: 'cascade' }),
+  exchangeId: text('exchange_id').references(() => exchanges.id, { onDelete: 'cascade' }),
+  symbol: text('symbol').notNull(),
+  liquidationPrice: real('liquidation_price').notNull(),
+  warningThreshold: real('warning_threshold').default(0.1), // 10% default
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  lastAlertAt: integer('last_alert_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// Notification History
+export const notifications = sqliteTable('notifications', {
+  id: text('id').primaryKey(),
+  type: text('type', { enum: ['price_alert', 'liquidation_warning', 'system', 'sync_error'] }).notNull(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  severity: text('severity', { enum: ['info', 'warning', 'critical'] }).default('info'),
+  isRead: integer('is_read', { mode: 'boolean' }).default(false),
+  metadata: text('metadata'), // JSON for additional data
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
 // Relations
@@ -205,3 +258,11 @@ export type TaxReport = typeof taxReports.$inferSelect;
 export type NewTaxReport = typeof taxReports.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
+export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
+export type NewPortfolioSnapshot = typeof portfolioSnapshots.$inferInsert;
+export type PriceAlert = typeof priceAlerts.$inferSelect;
+export type NewPriceAlert = typeof priceAlerts.$inferInsert;
+export type LiquidationAlert = typeof liquidationAlerts.$inferSelect;
+export type NewLiquidationAlert = typeof liquidationAlerts.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
