@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useDisconnect } from 'wagmi';
 import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
 import { toast } from '../../components/Toast';
@@ -25,6 +26,7 @@ import {
 
 export function SettingsPage() {
   const { settings, isLoading, isSaving, loadSettings, updateSetting } = useSettingsStore();
+  const { disconnect } = useDisconnect();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -43,7 +45,8 @@ export function SettingsPage() {
 
   const loadZapperApiKey = async () => {
     try {
-      if (window.electronAPI) {
+      // Only use safe storage - no localStorage fallback for security
+      if (window.electronAPI?.safeStorage) {
         const key = await window.electronAPI.safeStorage.decrypt('zapper_api_key');
         if (key) {
           zapperService.configure({ apiKey: key });
@@ -51,8 +54,10 @@ export function SettingsPage() {
           setZapperApiKeyMasked(zapperService.getApiKeyMasked());
         }
       }
+      // Note: API keys require Electron's safe storage for secure handling
     } catch {
-      // No key stored
+      // Safe storage not available or no key stored
+      console.warn('Safe storage not available for API key retrieval');
     }
   };
 
@@ -64,26 +69,37 @@ export function SettingsPage() {
 
     setIsTestingZapper(true);
     try {
-      // Configure and test
-      zapperService.configure({ apiKey: zapperApiKey.trim() });
-      const isValid = await zapperService.testConnection();
+      const key = zapperApiKey.trim();
 
-      if (!isValid) {
-        toast.error('Invalid API key. Please check and try again.');
-        zapperService.clearConfig();
-        return;
+      // Configure the service
+      zapperService.configure({ apiKey: key });
+
+      // Try to test, but don't block on failure (CORS issues in dev mode)
+      try {
+        const isValid = await zapperService.testConnection();
+        if (!isValid) {
+          console.warn('Zapper API test failed, but saving key anyway (may be CORS issue)');
+        }
+      } catch (testError) {
+        console.warn('Zapper API test error (likely CORS):', testError);
+        // Continue anyway - the key will be tested when actually used
       }
 
-      // Save to safe storage
-      if (window.electronAPI) {
-        await window.electronAPI.safeStorage.encrypt('zapper_api_key', zapperApiKey.trim());
+      // Save to safe storage only - no insecure fallback
+      if (window.electronAPI?.safeStorage) {
+        await window.electronAPI.safeStorage.encrypt('zapper_api_key', key);
+      } else {
+        toast.error('Secure storage not available. Please run in Electron for API key storage.');
+        zapperService.clearConfig();
+        return;
       }
 
       setZapperConfigured(true);
       setZapperApiKeyMasked(zapperService.getApiKeyMasked());
       setZapperApiKey('');
-      toast.success('Zapper API key saved successfully');
+      toast.success('Zapper API key saved. Test it by syncing DeFi positions.');
     } catch (error) {
+      console.error('Failed to save API key:', error);
       toast.error('Failed to save API key');
       zapperService.clearConfig();
     } finally {
@@ -93,9 +109,10 @@ export function SettingsPage() {
 
   const handleRemoveZapperApiKey = async () => {
     try {
-      if (window.electronAPI) {
+      if (window.electronAPI?.safeStorage) {
         await window.electronAPI.safeStorage.delete('zapper_api_key');
       }
+
       zapperService.clearConfig();
       setZapperConfigured(false);
       setZapperApiKeyMasked(null);
@@ -210,6 +227,24 @@ export function SettingsPage() {
     setIsClearing(true);
     try {
       const db = getDb();
+
+      // Disconnect wallet first (prevents auto-reconnect from adding it back)
+      try {
+        disconnect();
+      } catch {
+        // Wallet might not be connected
+      }
+
+      // Clear wagmi/RainbowKit localStorage state
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) =>
+          key.startsWith('wagmi') ||
+          key.startsWith('rk-') ||
+          key.startsWith('walletconnect') ||
+          key.includes('wallet') ||
+          key.includes('Wallet')
+      );
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
 
       // Delete all data from all tables (order matters due to foreign keys)
       await db.delete(onchainAssetsTable);
