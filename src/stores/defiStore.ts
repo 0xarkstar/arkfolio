@@ -100,15 +100,25 @@ export const useDefiStore = create<DefiState>((set, get) => ({
         protocol: p.protocol,
         positionType: (p.positionType || 'vault') as DefiPosition['positionType'],
         poolAddress: p.poolAddress,
-        assets: p.assets ? JSON.parse(p.assets) : [],
-        amounts: p.amounts ? JSON.parse(p.amounts).map((a: string) => new Decimal(a)) : [],
+        assets: (() => {
+          try { return p.assets ? JSON.parse(p.assets) : []; }
+          catch { return []; }
+        })(),
+        amounts: (() => {
+          try { return p.amounts ? JSON.parse(p.amounts).map((a: string) => new Decimal(a)) : []; }
+          catch { return []; }
+        })(),
         costBasisUsd: new Decimal(p.costBasisUsd || 0),
         currentValueUsd: new Decimal(p.currentValueUsd || 0),
-        rewardsEarned: p.rewardsEarned
-          ? Object.fromEntries(
-              Object.entries(JSON.parse(p.rewardsEarned)).map(([k, v]) => [k, new Decimal(v as string)])
-            )
-          : {},
+        rewardsEarned: (() => {
+          try {
+            return p.rewardsEarned
+              ? Object.fromEntries(
+                  Object.entries(JSON.parse(p.rewardsEarned)).map(([k, v]) => [k, new Decimal(v as string)])
+                )
+              : {};
+          } catch { return {}; }
+        })(),
         apy: p.apy,
         maturityDate: p.maturityDate ? new Date(p.maturityDate as unknown as number) : null,
         healthFactor: p.healthFactor,

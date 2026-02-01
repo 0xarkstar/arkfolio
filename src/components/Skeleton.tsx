@@ -53,7 +53,7 @@ export function Skeleton({
 // Pre-built skeleton patterns
 export function SkeletonCard() {
   return (
-    <div className="card p-4 animate-pulse">
+    <div className="card p-4 animate-pulse" role="status" aria-label="Loading content">
       <div className="h-4 w-28 bg-surface-700 rounded mb-2" />
       <div className="h-8 w-32 bg-surface-600 rounded" />
     </div>
@@ -144,7 +144,7 @@ export function LoadingSpinner({
 // Full-page loading state
 export function PageLoading({ message = 'Loading...' }: { message?: string }) {
   return (
-    <div className="flex items-center justify-center min-h-[200px] py-12">
+    <div className="flex items-center justify-center min-h-[200px] py-12" role="status" aria-label={message}>
       <LoadingSpinner size="lg" message={message} />
     </div>
   );
@@ -153,7 +153,7 @@ export function PageLoading({ message = 'Loading...' }: { message?: string }) {
 // Inline loading state for sections
 export function SectionLoading({ message = 'Loading...' }: { message?: string }) {
   return (
-    <div className="flex items-center justify-center py-8">
+    <div className="flex items-center justify-center py-8" role="status" aria-label={message}>
       <LoadingSpinner size="md" message={message} />
     </div>
   );

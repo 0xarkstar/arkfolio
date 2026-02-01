@@ -504,7 +504,7 @@ class ZapperService {
     // Check for GraphQL errors
     if (response?.errors?.length) {
       console.error('Zapper GraphQL errors:', response.errors);
-      throw new Error(response.errors[0].message);
+      throw new Error(response.errors?.[0]?.message || 'Unknown GraphQL error');
     }
 
     if (!response?.data?.portfolioV2?.appBalances?.byApp?.edges) {

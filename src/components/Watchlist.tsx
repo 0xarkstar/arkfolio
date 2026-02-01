@@ -63,7 +63,7 @@ export function Watchlist() {
     doRefresh();
     const interval = setInterval(doRefresh, 60000);
     return () => clearInterval(interval);
-  }, [items.length, refreshPrices]);
+  }, [items, refreshPrices]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -202,6 +202,7 @@ export function Watchlist() {
                   <button
                     onClick={() => handleRemove(item)}
                     className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-loss transition-opacity"
+                    aria-label={`Remove ${item.symbol} from watchlist`}
                   >
                     ×
                   </button>

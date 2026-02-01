@@ -484,8 +484,12 @@ export function DefiPage() {
 
   const avgApy = storePositions.length > 0
     ? getAverageApy()
-    : positions.filter((p) => p.apy && p.apy > 0).reduce((sum, p) => sum + (p.apy || 0), 0) /
-      positions.filter((p) => p.apy && p.apy > 0).length;
+    : (() => {
+        const filtered = positions.filter((p) => p.apy && p.apy > 0);
+        return filtered.length > 0
+          ? filtered.reduce((sum, p) => sum + (p.apy || 0), 0) / filtered.length
+          : 0;
+      })();
 
   const lowestHealth = storePositions.length > 0 ? getLowestHealthFactor() : null;
 
