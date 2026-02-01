@@ -127,7 +127,7 @@ export function NftPage() {
     try {
       await refreshFloorPrices();
       toast.success('Floor prices refreshed');
-    } catch (err) {
+    } catch {
       toast.error('Failed to refresh floor prices');
     }
   };

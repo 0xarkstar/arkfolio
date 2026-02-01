@@ -145,7 +145,7 @@ export function PortfolioPage() {
       });
 
       toast.success('Portfolio exported to Excel');
-    } catch (error) {
+    } catch {
       toast.error('Failed to export Excel file');
     }
   };

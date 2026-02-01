@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
+import { useNavigationStore } from '../stores/navigationStore';
 
 interface Shortcut {
   keys: string[];
@@ -115,7 +116,6 @@ export function useKeyboardNavigation() {
 
       // Number keys for navigation (without modifiers)
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        const { useNavigationStore } = require('../stores/navigationStore');
         const { setView } = useNavigationStore.getState();
 
         switch (e.key) {

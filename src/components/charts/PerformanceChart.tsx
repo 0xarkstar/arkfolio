@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, IChartApi, Time, LineData } from 'lightweight-charts';
+import { createChart, IChartApi, Time, LineData, LineSeries } from 'lightweight-charts';
 
 interface PerformanceData {
   label: string;
@@ -56,7 +56,7 @@ export function PerformanceChart({
 
     // Add each series as a line
     series.forEach((s) => {
-      const lineSeries = chart.addLineSeries({
+      const lineSeries = chart.addSeries(LineSeries, {
         color: s.color,
         lineWidth: 2,
         priceFormat: {

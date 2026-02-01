@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, LineData, Time, AreaSeries } from 'lightweight-charts';
 import { snapshotService, SnapshotPeriod, PortfolioDataPoint } from '../../services/portfolio/SnapshotService';
 
 interface PortfolioChartProps {
@@ -158,7 +158,7 @@ export function PortfolioChart({ height = 300, showTooltip = true, currentValue:
     chartRef.current = chart;
 
     // Create area series
-    const series = chart.addAreaSeries({
+    const series = chart.addSeries(AreaSeries, {
       lineColor: '#7c3aed',
       topColor: 'rgba(124, 58, 237, 0.4)',
       bottomColor: 'rgba(124, 58, 237, 0.0)',
