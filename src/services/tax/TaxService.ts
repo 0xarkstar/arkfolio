@@ -350,7 +350,12 @@ class TaxService {
     if (reports.length === 0) return null;
 
     const report = reports[0];
-    const reportData = report.reportData ? JSON.parse(report.reportData) : { transactions: [] };
+    let reportData: { transactions?: Record<string, unknown>[] } = { transactions: [] };
+    try {
+      reportData = report.reportData ? JSON.parse(report.reportData) : { transactions: [] };
+    } catch {
+      reportData = { transactions: [] };
+    }
 
     return {
       year: report.year,
@@ -361,8 +366,13 @@ class TaxService {
       taxableGainsKrw: new Decimal(report.taxableGainsKrw || 0),
       estimatedTaxKrw: new Decimal(report.estimatedTaxKrw || 0),
       totalTransactions: reportData.transactions?.length || 0,
-      taxableTransactions: (reportData.transactions || []).map((tx: Record<string, unknown>) => ({
-        ...tx,
+      taxableTransactions: (reportData.transactions || []).map((tx) => ({
+        id: tx.id as string,
+        type: tx.type as TaxableTransaction['type'],
+        asset: tx.asset as string,
+        feeAsset: tx.feeAsset as string,
+        exchangeId: tx.exchangeId as string | null,
+        walletAddress: tx.walletAddress as string | null,
         date: new Date(tx.date as string),
         amount: new Decimal(tx.amount as string || 0),
         priceKrw: new Decimal(tx.priceKrw as string || 0),

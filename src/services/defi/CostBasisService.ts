@@ -349,7 +349,7 @@ class CostBasisService {
 
         if (response.errors?.length) {
           logger.error('Zapper transaction API errors:', response.errors);
-          throw new Error(response.errors[0].message);
+          throw new Error(response.errors?.[0]?.message || 'Unknown API error');
         }
 
         const edges: TransactionEdge[] = response.data?.transactionHistoryV2?.edges || [];
@@ -382,9 +382,13 @@ class CostBasisService {
 
       // Show date range of fetched transactions
       if (allTransactions.length > 0) {
-        const newest = new Date(allTransactions[0].transaction.timestamp * 1000);
-        const oldest = new Date(allTransactions[allTransactions.length - 1].transaction.timestamp * 1000);
-        logger.debug(`Date range: ${oldest.toLocaleDateString()} ~ ${newest.toLocaleDateString()}`);
+        const firstTx = allTransactions[0];
+        const lastTx = allTransactions[allTransactions.length - 1];
+        if (firstTx?.transaction?.timestamp && lastTx?.transaction?.timestamp) {
+          const newest = new Date(firstTx.transaction.timestamp * 1000);
+          const oldest = new Date(lastTx.transaction.timestamp * 1000);
+          logger.debug(`Date range: ${oldest.toLocaleDateString()} ~ ${newest.toLocaleDateString()}`);
+        }
       }
 
       // Log sample of transactions for debugging
@@ -473,16 +477,23 @@ class CostBasisService {
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        const parsed = JSON.parse(cached);
+        let parsed: { timestamp?: number; data?: { description: string; tokens: Array<{ symbol: string; amount: string; priceUsd: number }> } };
+        try {
+          parsed = JSON.parse(cached);
+        } catch {
+          // Invalid JSON, remove corrupted entry
+          localStorage.removeItem(cacheKey);
+          return null;
+        }
         // Check TTL
-        if (Date.now() - parsed.timestamp < this.TX_DETAILS_CACHE_TTL) {
+        if (parsed.timestamp && parsed.data && Date.now() - parsed.timestamp < this.TX_DETAILS_CACHE_TTL) {
           return parsed.data;
         }
         // Expired, remove it
         localStorage.removeItem(cacheKey);
       }
     } catch {
-      // Invalid cache entry
+      // localStorage access error
     }
     return null;
   }
@@ -538,7 +549,7 @@ class CostBasisService {
       );
 
       if (response.errors?.length) {
-        logger.debug(`Error fetching tx details: ${response.errors[0].message}`);
+        logger.debug(`Error fetching tx details: ${response.errors?.[0]?.message || 'Unknown error'}`);
         return null;
       }
 

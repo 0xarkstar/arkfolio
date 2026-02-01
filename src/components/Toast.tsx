@@ -14,10 +14,13 @@ interface ToastState {
   removeToast: (id: string) => void;
 }
 
+// Counter for unique toast IDs (avoids collision compared to Math.random)
+let toastIdCounter = 0;
+
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   addToast: (message, type, duration = 3000) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = `toast-${++toastIdCounter}-${Date.now()}`;
     set((state) => ({
       toasts: [...state.toasts, { id, message, type, duration }],
     }));

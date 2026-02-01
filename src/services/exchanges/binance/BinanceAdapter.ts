@@ -472,7 +472,11 @@ export class BinanceAdapter extends BaseExchangeAdapter {
       };
 
       this.ws.onmessage = (event) => {
-        this.handleWebSocketMessage(JSON.parse(event.data));
+        try {
+          this.handleWebSocketMessage(JSON.parse(event.data));
+        } catch (e) {
+          logger.warn('Invalid WebSocket message', { error: e });
+        }
       };
 
       this.ws.onerror = (error) => {
