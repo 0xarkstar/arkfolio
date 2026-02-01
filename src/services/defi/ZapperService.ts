@@ -525,7 +525,7 @@ class ZapperService {
         // Extract assets and amounts
         const assets: string[] = [];
         const amounts: Decimal[] = [];
-        let totalValue = new Decimal(positionNode.balanceUSD || 0);
+        const totalValue = new Decimal(positionNode.balanceUSD || 0);
 
         // Use symbol if available (AppTokenPositionBalance has it)
         if (positionNode.symbol) {

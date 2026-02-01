@@ -112,7 +112,7 @@ export function TaxPage() {
       });
 
       toast.success(`Tax report exported as Excel`);
-    } catch (error) {
+    } catch {
       toast.error('Failed to export Excel file');
     }
   };

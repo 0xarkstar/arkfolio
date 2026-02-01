@@ -155,7 +155,7 @@ export class EVMProvider {
         balance: balanceDecimal,
         balanceRaw: balance.toString(),
       };
-    } catch (error) {
+    } catch {
       // Token might not exist or be a proxy - skip silently
       return null;
     }

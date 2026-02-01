@@ -45,7 +45,7 @@ export function RebalancePage() {
     try {
       await setTargetAllocation(asset, percent);
       toast.success(`Target for ${asset} set to ${percent}%`);
-    } catch (err) {
+    } catch {
       toast.error('Failed to save allocation');
     }
   };
@@ -54,7 +54,7 @@ export function RebalancePage() {
     try {
       await removeAllocation(id);
       toast.info('Allocation removed');
-    } catch (err) {
+    } catch {
       toast.error('Failed to remove allocation');
     }
   };
@@ -64,7 +64,7 @@ export function RebalancePage() {
       await clearAllAllocations();
       toast.info('All allocations cleared');
       setShowClearConfirm(false);
-    } catch (err) {
+    } catch {
       toast.error('Failed to clear allocations');
     }
   };
