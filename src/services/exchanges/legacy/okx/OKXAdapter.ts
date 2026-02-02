@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import CryptoJS from 'crypto-js';
 import Decimal from 'decimal.js';
-import { BaseExchangeAdapter } from '../BaseAdapter';
+import { BaseExchangeAdapter } from '../../BaseAdapter';
 import {
   ExchangeCredentials,
   ExchangeInfo,
@@ -14,9 +14,9 @@ import {
   TradeHistoryParams,
   TransferHistoryParams,
   SupportedExchange,
-} from '../types';
-import { logger } from '../../../utils/logger';
-import { HttpError, HttpErrorType } from '../../utils/httpUtils';
+} from '../../types';
+import { logger } from '../../../../utils/logger';
+import { HttpError, HttpErrorType } from '../../../utils/httpUtils';
 
 // OKX API response types
 interface OKXResponse<T> {

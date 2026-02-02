@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
-import { BinanceAdapter } from '../binance/BinanceAdapter';
+import { BinanceAdapter } from '../legacy/binance/BinanceAdapter';
 import { SupportedExchange } from '../types';
 
 // Mock axios with AxiosError

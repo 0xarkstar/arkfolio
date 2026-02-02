@@ -1,20 +1,35 @@
 export * from './types';
 export * from './BaseAdapter';
-export { BinanceAdapter } from './binance';
-export { UpbitAdapter } from './upbit';
-export { OKXAdapter } from './okx';
-export { HyperliquidAdapter } from './hyperliquid';
-export { DydxAdapter } from './dydx';
+export { CCXTAdapter, isCCXTSupported, getExchangeConfig, CCXT_SUPPORTED_EXCHANGES } from './CCXTAdapter';
+
+// Legacy adapters (kept for reference during transition)
+export { BinanceAdapter } from './legacy/binance';
+export { UpbitAdapter } from './legacy/upbit';
+export { OKXAdapter } from './legacy/okx';
+export { HyperliquidAdapter } from './legacy/hyperliquid';
+export { DydxAdapter } from './legacy/dydx';
 
 import { IExchangeAdapter, SupportedExchange, ExchangeCredentials } from './types';
-import { BinanceAdapter } from './binance';
-import { UpbitAdapter } from './upbit';
-import { OKXAdapter } from './okx';
-import { HyperliquidAdapter } from './hyperliquid';
-import { DydxAdapter } from './dydx';
+import { CCXTAdapter, isCCXTSupported } from './CCXTAdapter';
 
-// Exchange adapter factory
+// Fallback to legacy adapters for any exchanges not supported by CCXT
+import { BinanceAdapter } from './legacy/binance';
+import { UpbitAdapter } from './legacy/upbit';
+import { OKXAdapter } from './legacy/okx';
+import { HyperliquidAdapter } from './legacy/hyperliquid';
+import { DydxAdapter } from './legacy/dydx';
+
+/**
+ * Create an exchange adapter for the given exchange ID.
+ * Uses CCXTAdapter for all CCXT-supported exchanges.
+ */
 export function createExchangeAdapter(exchangeId: SupportedExchange): IExchangeAdapter {
+  // Use CCXTAdapter for all supported exchanges
+  if (isCCXTSupported(exchangeId)) {
+    return new CCXTAdapter(exchangeId);
+  }
+
+  // Fallback to legacy adapters (should not be reached for supported exchanges)
   switch (exchangeId) {
     case SupportedExchange.BINANCE:
       return new BinanceAdapter();

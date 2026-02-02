@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import Decimal from 'decimal.js';
-import { BaseExchangeAdapter } from '../BaseAdapter';
+import { BaseExchangeAdapter } from '../../BaseAdapter';
 import {
   ExchangeCredentials,
   ExchangeInfo,
@@ -13,7 +13,7 @@ import {
   TradeHistoryParams,
   TransferHistoryParams,
   SupportedExchange,
-} from '../types';
+} from '../../types';
 
 // dYdX v4 API response types
 interface DydxSubaccount {

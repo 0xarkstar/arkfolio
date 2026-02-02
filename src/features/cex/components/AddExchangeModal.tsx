@@ -25,11 +25,24 @@ interface ExchangeOption {
 }
 
 const exchangeOptions: ExchangeOption[] = [
-  // CEX
+  // CEX - 글로벌
   { id: SupportedExchange.BINANCE, name: 'Binance', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures, Earn' },
-  { id: SupportedExchange.UPBIT, name: 'Upbit', type: 'cex', requiresPassphrase: false, description: 'Spot trading' },
   { id: SupportedExchange.OKX, name: 'OKX', type: 'cex', requiresPassphrase: true, description: 'Spot, Futures, Earn' },
-  // DEX
+  { id: SupportedExchange.BYBIT, name: 'Bybit', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures' },
+  { id: SupportedExchange.KRAKEN, name: 'Kraken', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures, Earn' },
+  { id: SupportedExchange.COINBASE, name: 'Coinbase', type: 'cex', requiresPassphrase: false, description: 'Spot trading' },
+  { id: SupportedExchange.GATE, name: 'Gate.io', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures' },
+  // CEX - Travel Rule 연동
+  { id: SupportedExchange.HTX, name: 'HTX', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures (구 Huobi)' },
+  { id: SupportedExchange.BITGET, name: 'Bitget', type: 'cex', requiresPassphrase: true, description: 'Spot, Futures, Copy Trading' },
+  { id: SupportedExchange.BINGX, name: 'BingX', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures' },
+  { id: SupportedExchange.LBANK, name: 'LBANK', type: 'cex', requiresPassphrase: false, description: 'Spot trading' },
+  { id: SupportedExchange.WOO, name: 'Woo X', type: 'cex', requiresPassphrase: false, description: 'Spot, Futures (Zero Fee)' },
+  // CEX - 한국 VASP
+  { id: SupportedExchange.UPBIT, name: 'Upbit', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
+  { id: SupportedExchange.BITHUMB, name: 'Bithumb', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
+  { id: SupportedExchange.COINONE, name: 'Coinone', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
+  // DEX / Perp
   { id: SupportedExchange.HYPERLIQUID, name: 'Hyperliquid', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: 'Perpetuals DEX' },
   { id: SupportedExchange.DYDX, name: 'dYdX', type: 'dex', requiresPassphrase: false, addressType: 'cosmos', description: 'Perpetuals DEX (v4)' },
 ];

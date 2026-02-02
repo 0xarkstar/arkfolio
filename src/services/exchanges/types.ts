@@ -181,10 +181,24 @@ export type ExchangeFactory = (credentials: ExchangeCredentials) => IExchangeAda
 
 // Supported exchanges enum
 export enum SupportedExchange {
+  // CEX - 글로벌
   BINANCE = 'binance',
+  OKX = 'okx',
+  BYBIT = 'bybit',
+  KRAKEN = 'kraken',
+  COINBASE = 'coinbase',
+  GATE = 'gate',
+  // CEX - Travel Rule 연동
+  HTX = 'htx',
+  BITGET = 'bitget',
+  BINGX = 'bingx',
+  LBANK = 'lbank',
+  WOO = 'woo',
+  // CEX - 한국 VASP
   UPBIT = 'upbit',
   BITHUMB = 'bithumb',
-  OKX = 'okx',
+  COINONE = 'coinone',
+  // DEX/Perp
   HYPERLIQUID = 'hyperliquid',
   DYDX = 'dydx',
 }

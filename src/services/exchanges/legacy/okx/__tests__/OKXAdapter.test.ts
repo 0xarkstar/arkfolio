@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 import { OKXAdapter } from '../OKXAdapter';
-import { SupportedExchange } from '../../types';
+import { SupportedExchange } from '../../../types';
 
 // Mock axios
 vi.mock('axios', async (importOriginal) => {

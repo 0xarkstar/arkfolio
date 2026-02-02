@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import CryptoJS from 'crypto-js';
-import { BaseExchangeAdapter } from '../BaseAdapter';
+import { BaseExchangeAdapter } from '../../BaseAdapter';
 import {
   ExchangeCredentials,
   ExchangeInfo,
@@ -13,7 +13,7 @@ import {
   TradeHistoryParams,
   TransferHistoryParams,
   SupportedExchange,
-} from '../types';
+} from '../../types';
 
 // Upbit API response types
 interface UpbitAccount {

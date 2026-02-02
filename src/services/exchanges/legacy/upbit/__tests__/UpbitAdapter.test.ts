@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import { UpbitAdapter } from '../UpbitAdapter';
-import { SupportedExchange } from '../../types';
+import { SupportedExchange } from '../../../types';
 
 // Mock axios
 vi.mock('axios', async (importOriginal) => {

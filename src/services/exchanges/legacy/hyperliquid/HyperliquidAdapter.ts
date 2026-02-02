@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { BaseExchangeAdapter } from '../BaseAdapter';
+import { BaseExchangeAdapter } from '../../BaseAdapter';
 import {
   ExchangeCredentials,
   ExchangeInfo,
@@ -12,7 +12,7 @@ import {
   TradeHistoryParams,
   TransferHistoryParams,
   SupportedExchange,
-} from '../types';
+} from '../../types';
 
 // Hyperliquid API response types
 interface HyperliquidAssetPosition {
