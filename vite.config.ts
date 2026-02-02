@@ -68,6 +68,8 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       '@electron': resolve(__dirname, 'electron'),
+      // Polyfill for node:net (needed by CCXT's node-fetch)
+      'node:net': resolve(__dirname, 'src/polyfills/net-polyfill.ts'),
     },
   },
   build: {
