@@ -14,13 +14,14 @@ interface AddExchangeModalProps {
 }
 
 type ExchangeType = 'cex' | 'dex';
+type ChainType = 'evm' | 'cosmos' | 'solana' | 'starknet';
 
 interface ExchangeOption {
   id: SupportedExchange;
   name: string;
   type: ExchangeType;
   requiresPassphrase: boolean;
-  addressType?: 'evm' | 'cosmos';
+  addressType?: ChainType;
   description: string;
 }
 
@@ -42,9 +43,20 @@ const exchangeOptions: ExchangeOption[] = [
   { id: SupportedExchange.UPBIT, name: 'Upbit', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
   { id: SupportedExchange.BITHUMB, name: 'Bithumb', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
   { id: SupportedExchange.COINONE, name: 'Coinone', type: 'cex', requiresPassphrase: false, description: '한국 원화 거래' },
-  // DEX / Perp
-  { id: SupportedExchange.HYPERLIQUID, name: 'Hyperliquid', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: 'Perpetuals DEX' },
-  { id: SupportedExchange.DYDX, name: 'dYdX', type: 'dex', requiresPassphrase: false, addressType: 'cosmos', description: 'Perpetuals DEX (v4)' },
+  // Perp DEX - EVM
+  { id: SupportedExchange.HYPERLIQUID, name: 'Hyperliquid', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: '228 Perp Markets' },
+  { id: SupportedExchange.GMX, name: 'GMX v2', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: 'Arbitrum Perps' },
+  { id: SupportedExchange.GRVT, name: 'GRVT', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: '80 Perp Markets' },
+  { id: SupportedExchange.LIGHTER, name: 'Lighter', type: 'dex', requiresPassphrase: false, addressType: 'evm', description: '132 Perp Markets' },
+  // Perp DEX - Cosmos
+  { id: SupportedExchange.DYDX, name: 'dYdX v4', type: 'dex', requiresPassphrase: false, addressType: 'cosmos', description: '220+ Perp Markets' },
+  // Perp DEX - Solana
+  { id: SupportedExchange.JUPITER, name: 'Jupiter Perps', type: 'dex', requiresPassphrase: false, addressType: 'solana', description: 'Solana Perps' },
+  { id: SupportedExchange.DRIFT, name: 'Drift Protocol', type: 'dex', requiresPassphrase: false, addressType: 'solana', description: 'Solana 30+ Perps' },
+  { id: SupportedExchange.BACKPACK, name: 'Backpack', type: 'dex', requiresPassphrase: false, addressType: 'solana', description: '75 Perp + 79 Spot' },
+  // Perp DEX - StarkNet
+  { id: SupportedExchange.PARADEX, name: 'Paradex', type: 'dex', requiresPassphrase: false, addressType: 'starknet', description: 'StarkNet 108 Perps' },
+  { id: SupportedExchange.EDGEX, name: 'EdgeX', type: 'dex', requiresPassphrase: false, addressType: 'starknet', description: '292 Perp Markets' },
 ];
 
 export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
@@ -103,8 +115,24 @@ export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
 
   const getAddressPlaceholder = () => {
     if (!selectedExchange) return '';
-    if (selectedExchange.addressType === 'cosmos') return 'dydx1...';
-    return '0x...';
+    switch (selectedExchange.addressType) {
+      case 'cosmos': return 'dydx1...';
+      case 'solana': return 'So1...';
+      case 'starknet': return '0x...';
+      case 'evm':
+      default: return '0x...';
+    }
+  };
+
+  const getAddressHint = () => {
+    if (!selectedExchange) return '';
+    switch (selectedExchange.addressType) {
+      case 'cosmos': return 'Enter your dYdX address (dydx1...)';
+      case 'solana': return 'Enter your Solana wallet address';
+      case 'starknet': return 'Enter your StarkNet account address (0x...)';
+      case 'evm':
+      default: return 'Enter your EVM wallet address (0x...)';
+    }
   };
 
   return (
@@ -182,9 +210,7 @@ export function AddExchangeModal({ isOpen, onClose }: AddExchangeModalProps) {
                 onChange={e => setCredentials({ ...credentials, apiKey: e.target.value })}
                 className="font-mono text-sm"
                 placeholder={getAddressPlaceholder()}
-                hint={selectedExchange.addressType === 'cosmos'
-                  ? 'Enter your dYdX address (dydx1...)'
-                  : 'Enter your EVM wallet address (0x...)'}
+                hint={getAddressHint()}
                 required
               />
 

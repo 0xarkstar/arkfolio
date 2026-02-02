@@ -1,8 +1,9 @@
 export * from './types';
 export * from './BaseAdapter';
 export { CCXTAdapter, isCCXTSupported, getExchangeConfig, CCXT_SUPPORTED_EXCHANGES } from './CCXTAdapter';
+export { PDAIOAdapter, isPDAIOSupported, getPerpDEXConfig, PDAIO_SUPPORTED_EXCHANGES, PERP_DEX_CONFIGS } from './PDAIOAdapter';
 
-// Legacy adapters (kept for reference during transition)
+// Legacy adapters (kept for reference)
 export { BinanceAdapter } from './legacy/binance';
 export { UpbitAdapter } from './legacy/upbit';
 export { OKXAdapter } from './legacy/okx';
@@ -11,39 +12,25 @@ export { DydxAdapter } from './legacy/dydx';
 
 import { IExchangeAdapter, SupportedExchange, ExchangeCredentials } from './types';
 import { CCXTAdapter, isCCXTSupported } from './CCXTAdapter';
-
-// Fallback to legacy adapters for any exchanges not supported by CCXT
-import { BinanceAdapter } from './legacy/binance';
-import { UpbitAdapter } from './legacy/upbit';
-import { OKXAdapter } from './legacy/okx';
-import { HyperliquidAdapter } from './legacy/hyperliquid';
-import { DydxAdapter } from './legacy/dydx';
+import { PDAIOAdapter, isPDAIOSupported } from './PDAIOAdapter';
 
 /**
  * Create an exchange adapter for the given exchange ID.
- * Uses CCXTAdapter for all CCXT-supported exchanges.
+ * - Uses CCXTAdapter for CEX (centralized exchanges)
+ * - Uses PDAIOAdapter for Perp DEX (decentralized perpetual exchanges)
  */
 export function createExchangeAdapter(exchangeId: SupportedExchange): IExchangeAdapter {
-  // Use CCXTAdapter for all supported exchanges
+  // Use PDAIOAdapter for perp DEX
+  if (isPDAIOSupported(exchangeId)) {
+    return new PDAIOAdapter(exchangeId);
+  }
+
+  // Use CCXTAdapter for CEX
   if (isCCXTSupported(exchangeId)) {
     return new CCXTAdapter(exchangeId);
   }
 
-  // Fallback to legacy adapters (should not be reached for supported exchanges)
-  switch (exchangeId) {
-    case SupportedExchange.BINANCE:
-      return new BinanceAdapter();
-    case SupportedExchange.UPBIT:
-      return new UpbitAdapter();
-    case SupportedExchange.OKX:
-      return new OKXAdapter();
-    case SupportedExchange.HYPERLIQUID:
-      return new HyperliquidAdapter();
-    case SupportedExchange.DYDX:
-      return new DydxAdapter();
-    default:
-      throw new Error(`Unsupported exchange: ${exchangeId}`);
-  }
+  throw new Error(`Unsupported exchange: ${exchangeId}`);
 }
 
 // Exchange manager class for managing multiple exchange connections

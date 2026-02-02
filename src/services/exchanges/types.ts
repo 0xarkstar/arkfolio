@@ -198,9 +198,18 @@ export enum SupportedExchange {
   UPBIT = 'upbit',
   BITHUMB = 'bithumb',
   COINONE = 'coinone',
-  // DEX/Perp
+  // Perp DEX - PD-AIO-SDK
   HYPERLIQUID = 'hyperliquid',
   DYDX = 'dydx',
+  JUPITER = 'jupiter',
+  DRIFT = 'drift',
+  GMX = 'gmx',
+  VERTEX = 'vertex',
+  PARADEX = 'paradex',
+  GRVT = 'grvt',
+  EDGEX = 'edgex',
+  BACKPACK = 'backpack',
+  LIGHTER = 'lighter',
 }
 
 // Exchange status

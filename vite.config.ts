@@ -66,6 +66,11 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
       },
+      // Externalize Node.js native modules that can't be bundled
+      external: [
+        'pd-aio-sdk',
+        'koffi',
+      ],
       output: {
         manualChunks: {
           // Vendor chunks
@@ -84,6 +89,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['sql.js'],
+    exclude: ['pd-aio-sdk', 'koffi'],
   },
   server: {
     port: 5173,

@@ -74,7 +74,7 @@ test.describe('Exchange Modal - Phase 10.1 Korean VASP/Travel Rule', () => {
     }
   });
 
-  test('should display DEX exchanges in DEX tab', async ({ page }) => {
+  test('should display all 10 Perp DEX exchanges in DEX tab', async ({ page }) => {
     // Navigate to CEX page
     const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
 
@@ -96,9 +96,27 @@ test.describe('Exchange Modal - Phase 10.1 Korean VASP/Travel Rule', () => {
         await dexTab.click();
         await page.waitForTimeout(300);
 
-        // Verify DEX exchanges
-        const dexExchanges = ['Hyperliquid', 'dYdX'];
-        for (const exchange of dexExchanges) {
+        // Verify EVM Perp DEX
+        const evmDexes = ['Hyperliquid', 'GMX', 'GRVT', 'Lighter'];
+        for (const exchange of evmDexes) {
+          const exchangeOption = page.locator(`text=${exchange}`).first();
+          expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
+        }
+
+        // Verify Cosmos Perp DEX
+        const dydxOption = page.locator('text=dYdX').first();
+        expect(await dydxOption.count(), 'dYdX should be visible').toBeGreaterThan(0);
+
+        // Verify Solana Perp DEX
+        const solanaDexes = ['Jupiter', 'Drift', 'Backpack'];
+        for (const exchange of solanaDexes) {
+          const exchangeOption = page.locator(`text=${exchange}`).first();
+          expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
+        }
+
+        // Verify StarkNet Perp DEX
+        const starknetDexes = ['Paradex', 'EdgeX'];
+        for (const exchange of starknetDexes) {
           const exchangeOption = page.locator(`text=${exchange}`).first();
           expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
         }
