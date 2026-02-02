@@ -2,12 +2,23 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
+    // Node.js polyfills for Web3 libraries (buffer, process, events, etc.)
+    nodePolyfills({
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      // Exclude ccxt and problematic modules
+      exclude: ['net', 'dns', 'tls', 'fs', 'child_process'],
+    }),
     // Bundle analysis - generates stats.html when building
     visualizer({
       filename: 'dist/stats.html',

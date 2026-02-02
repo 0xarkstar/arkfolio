@@ -238,7 +238,8 @@ export class PDAIOAdapter extends BaseExchangeAdapter {
 
     try {
       // Check if we're in an Electron main process environment
-      const isElectron = typeof window !== 'undefined' && window.process?.type === 'renderer';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isElectron = typeof window !== 'undefined' && (window as any).process?.type === 'renderer';
 
       if (isElectron) {
         // In Electron renderer, we need to use IPC to communicate with main process

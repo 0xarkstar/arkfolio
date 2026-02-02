@@ -1,4 +1,19 @@
-import ccxt, { Exchange, Balances, Position as CCXTPosition, Trade as CCXTTrade, Transaction } from 'ccxt';
+// CCXT types - imported dynamically to avoid bundling issues
+type Exchange = import('ccxt').Exchange;
+type Balances = import('ccxt').Balances;
+type CCXTPosition = import('ccxt').Position;
+type CCXTTrade = import('ccxt').Trade;
+type Transaction = import('ccxt').Transaction;
+
+// Dynamic CCXT loader
+let ccxtModule: typeof import('ccxt') | null = null;
+async function getCCXT(): Promise<typeof import('ccxt')> {
+  if (!ccxtModule) {
+    ccxtModule = await import('ccxt');
+  }
+  return ccxtModule;
+}
+
 import { BaseExchangeAdapter } from './BaseAdapter';
 import {
   ExchangeCredentials,
@@ -324,7 +339,7 @@ export class CCXTAdapter extends BaseExchangeAdapter {
   readonly exchangeId: string;
   readonly exchangeInfo: ExchangeInfo;
 
-  private exchange: Exchange;
+  private exchange: Exchange | null = null;
   private config: CCXTExchangeConfig;
   private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -350,19 +365,31 @@ export class CCXTAdapter extends BaseExchangeAdapter {
       this.rateLimitConfig = config.rateLimitConfig;
     }
 
+    // Exchange will be created lazily in connect() to avoid bundling CCXT at startup
+  }
+
+  private getExchange(): Exchange {
+    if (!this.exchange) {
+      throw new Error('Exchange not connected. Call connect() first.');
+    }
+    return this.exchange;
+  }
+
+  async connect(credentials: ExchangeCredentials): Promise<void> {
+    this.credentials = credentials;
+
+    // Dynamically import CCXT only when connecting
+    const ccxt = await getCCXT();
+
     // Create CCXT exchange instance
-    const ExchangeClass = ccxt[config.ccxtId as keyof typeof ccxt] as typeof Exchange;
+    const ExchangeClass = ccxt[this.config.ccxtId as keyof typeof ccxt] as new (config: Record<string, unknown>) => Exchange;
     if (!ExchangeClass) {
-      throw new Error(`CCXT does not support exchange: ${config.ccxtId}`);
+      throw new Error(`CCXT does not support exchange: ${this.config.ccxtId}`);
     }
 
     this.exchange = new ExchangeClass({
       enableRateLimit: true,
     });
-  }
-
-  async connect(credentials: ExchangeCredentials): Promise<void> {
-    this.credentials = credentials;
 
     // Configure exchange credentials
     this.exchange.apiKey = credentials.apiKey;
@@ -409,13 +436,13 @@ export class CCXTAdapter extends BaseExchangeAdapter {
 
       // For DEX exchanges, just try to fetch balance
       if (this.config.type === 'dex' || this.config.type === 'perp') {
-        await this.exchange.fetchBalance();
+        await this.getExchange().fetchBalance();
         return true;
       }
 
       // For CEX, use the standard check account endpoint
-      if (this.exchange.has['fetchBalance']) {
-        await this.exchange.fetchBalance();
+      if (this.getExchange().has['fetchBalance']) {
+        await this.getExchange().fetchBalance();
         return true;
       }
 
@@ -442,7 +469,7 @@ export class CCXTAdapter extends BaseExchangeAdapter {
 
     try {
       await this.checkRateLimit();
-      const balance = await this.exchange.fetchBalance({ type: 'spot' });
+      const balance = await this.getExchange().fetchBalance({ type: 'spot' });
       return this.mapBalances(balance, 'spot');
     } catch (error) {
       const httpError = HttpError.fromError(error);
@@ -461,17 +488,17 @@ export class CCXTAdapter extends BaseExchangeAdapter {
 
       // Different exchanges use different account types for futures
       let balance: Balances;
-      if (this.exchange.has['fetchBalance']) {
+      if (this.getExchange().has['fetchBalance']) {
         // Try to fetch futures/swap balance
         try {
-          balance = await this.exchange.fetchBalance({ type: 'swap' });
+          balance = await this.getExchange().fetchBalance({ type: 'swap' });
         } catch {
           // Fallback to futures type
           try {
-            balance = await this.exchange.fetchBalance({ type: 'future' });
+            balance = await this.getExchange().fetchBalance({ type: 'future' });
           } catch {
             // Some exchanges use linear/inverse
-            balance = await this.exchange.fetchBalance({ type: 'linear' });
+            balance = await this.getExchange().fetchBalance({ type: 'linear' });
           }
         }
       } else {
@@ -494,11 +521,11 @@ export class CCXTAdapter extends BaseExchangeAdapter {
     try {
       await this.checkRateLimit();
 
-      if (!this.exchange.has['fetchPositions']) {
+      if (!this.getExchange().has['fetchPositions']) {
         return [];
       }
 
-      const positions = await this.exchange.fetchPositions();
+      const positions = await this.getExchange().fetchPositions();
       return this.mapPositions(positions);
     } catch (error) {
       const httpError = HttpError.fromError(error);
@@ -523,11 +550,11 @@ export class CCXTAdapter extends BaseExchangeAdapter {
     try {
       await this.checkRateLimit();
 
-      if (!this.exchange.has['fetchMyTrades']) {
+      if (!this.getExchange().has['fetchMyTrades']) {
         return [];
       }
 
-      const trades = await this.exchange.fetchMyTrades(
+      const trades = await this.getExchange().fetchMyTrades(
         params?.symbol,
         params?.since,
         params?.limit || 500
@@ -549,11 +576,11 @@ export class CCXTAdapter extends BaseExchangeAdapter {
     try {
       await this.checkRateLimit();
 
-      if (!this.exchange.has['fetchDeposits']) {
+      if (!this.getExchange().has['fetchDeposits']) {
         return [];
       }
 
-      const deposits = await this.exchange.fetchDeposits(
+      const deposits = await this.getExchange().fetchDeposits(
         params?.asset,
         params?.since,
         params?.limit || 100
@@ -575,11 +602,11 @@ export class CCXTAdapter extends BaseExchangeAdapter {
     try {
       await this.checkRateLimit();
 
-      if (!this.exchange.has['fetchWithdrawals']) {
+      if (!this.getExchange().has['fetchWithdrawals']) {
         return [];
       }
 
-      const withdrawals = await this.exchange.fetchWithdrawals(
+      const withdrawals = await this.getExchange().fetchWithdrawals(
         params?.asset,
         params?.since,
         params?.limit || 100
@@ -601,14 +628,14 @@ export class CCXTAdapter extends BaseExchangeAdapter {
     try {
       await this.checkRateLimit();
 
-      if (!this.exchange.has['fetchFundingRates'] && !this.exchange.has['fetchFundingRate']) {
+      if (!this.getExchange().has['fetchFundingRates'] && !this.getExchange().has['fetchFundingRate']) {
         return [];
       }
 
       const rates: FundingRate[] = [];
 
-      if (this.exchange.has['fetchFundingRates']) {
-        const fundingRates = await this.exchange.fetchFundingRates(symbols);
+      if (this.getExchange().has['fetchFundingRates']) {
+        const fundingRates = await this.getExchange().fetchFundingRates(symbols);
         for (const [symbol, rate] of Object.entries(fundingRates)) {
           if (rate) {
             rates.push({
@@ -619,10 +646,10 @@ export class CCXTAdapter extends BaseExchangeAdapter {
             });
           }
         }
-      } else if (symbols && symbols.length > 0 && this.exchange.has['fetchFundingRate']) {
+      } else if (symbols && symbols.length > 0 && this.getExchange().has['fetchFundingRate']) {
         for (const symbol of symbols) {
           try {
-            const rate = await this.exchange.fetchFundingRate(symbol);
+            const rate = await this.getExchange().fetchFundingRate(symbol);
             if (rate) {
               rates.push({
                 symbol,
