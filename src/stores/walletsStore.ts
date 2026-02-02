@@ -6,8 +6,8 @@ import { eq } from 'drizzle-orm';
 import { walletService, Chain, WalletSummary, TokenBalance, NativeBalance } from '../services/blockchain';
 import { getEVMChains } from '../services/blockchain/chains';
 
-// Wallet types: EVM (all EVM chains) or SOLANA
-export type WalletType = 'EVM' | 'SOLANA';
+// Wallet types: EVM (all EVM chains), SOLANA, or SUI
+export type WalletType = 'EVM' | 'SOLANA' | 'SUI';
 
 export interface StoredWallet {
   id: string;
@@ -56,9 +56,15 @@ interface WalletsState {
 
 // Helper to detect wallet type from address
 function detectWalletType(address: string): WalletType {
+  // EVM addresses: 0x followed by 40 hex chars
   if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
     return 'EVM';
   }
+  // SUI addresses: 0x followed by 64 hex chars
+  if (/^0x[a-fA-F0-9]{64}$/.test(address)) {
+    return 'SUI';
+  }
+  // Default to Solana (base58 encoded)
   return 'SOLANA';
 }
 
@@ -66,6 +72,9 @@ function detectWalletType(address: string): WalletType {
 function getChainsForWalletType(walletType: WalletType): Chain[] {
   if (walletType === 'EVM') {
     return getEVMChains().map(c => c.id);
+  }
+  if (walletType === 'SUI') {
+    return [Chain.SUI];
   }
   return [Chain.SOLANA];
 }
@@ -124,6 +133,9 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
       }
       if (walletType === 'SOLANA' && !walletService.isValidSolanaAddress(address)) {
         throw new Error('Invalid Solana wallet address');
+      }
+      if (walletType === 'SUI' && !walletService.isValidSuiAddress(address)) {
+        throw new Error('Invalid SUI wallet address');
       }
 
       // Check if already exists (same address)

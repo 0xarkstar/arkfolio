@@ -4,6 +4,7 @@ import { useNavigationStore, ViewId } from './stores/navigationStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { initDatabase } from './database/init';
 import { useAutoSync } from './hooks';
+import { useExchangeRealtimeSync } from './hooks/useExchangeRealtimeSync';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './components/Dashboard';
 import { ToastContainer } from './components/Toast';
@@ -67,6 +68,9 @@ function App() {
 
   // Enable auto-sync when database is ready
   useAutoSync();
+
+  // Enable real-time WebSocket sync for exchanges
+  useExchangeRealtimeSync();
 
   // Enable keyboard navigation
   useKeyboardNavigation();

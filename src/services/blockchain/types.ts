@@ -10,6 +10,7 @@ export enum Chain {
   BSC = 'bsc',
   AVALANCHE = 'avalanche',
   SOLANA = 'solana',
+  SUI = 'sui',
 }
 
 // Chain configuration

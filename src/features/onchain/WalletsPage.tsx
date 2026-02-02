@@ -310,9 +310,10 @@ export function WalletsPage() {
                 { value: 'all', label: 'All Types' },
                 { value: 'EVM', label: 'EVM Wallets' },
                 { value: 'SOLANA', label: 'Solana Wallets' },
+                { value: 'SUI', label: 'SUI Wallets' },
               ]}
               size="sm"
-              className="w-32"
+              className="w-36"
             />
             <Select
               value={`${sortField}-${sortDirection}`}
@@ -379,7 +380,7 @@ export function WalletsPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-surface-700 flex items-center justify-center text-lg">
-                    {wallet.walletType === 'EVM' ? '⟠' : '◎'}
+                    {wallet.walletType === 'EVM' ? '⟠' : wallet.walletType === 'SUI' ? '💧' : '◎'}
                   </div>
                   <div>
                     <p className="font-medium text-surface-100">{wallet.label}</p>
@@ -395,7 +396,7 @@ export function WalletsPage() {
                       </span>
                     </div>
                   </div>
-                  <Badge size="sm" variant={wallet.walletType === 'EVM' ? 'primary' : 'info'}>
+                  <Badge size="sm" variant={wallet.walletType === 'EVM' ? 'primary' : wallet.walletType === 'SUI' ? 'success' : 'info'}>
                     {wallet.walletType}
                   </Badge>
                   {wallet.chainBalances.length > 0 && (
@@ -610,11 +611,11 @@ export function WalletsPage() {
               value={newWalletAddress}
               onChange={(e) => setNewWalletAddress(e.target.value)}
               className="font-mono"
-              placeholder="0x... (EVM) or Solana address"
+              placeholder="0x... (EVM/SUI) or Solana address"
               required
             />
             <p className="text-xs text-surface-500 mt-1">
-              EVM addresses (0x...) will be tracked across all EVM chains automatically
+              EVM (0x + 40 chars), SUI (0x + 64 chars), or Solana (base58)
             </p>
           </div>
 

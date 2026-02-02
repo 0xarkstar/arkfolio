@@ -83,11 +83,21 @@ class WalletService {
   }
 
   /**
+   * Check if address is valid SUI address (0x followed by 64 hex chars)
+   */
+  isValidSuiAddress(address: string): boolean {
+    return /^0x[a-fA-F0-9]{64}$/.test(address);
+  }
+
+  /**
    * Check if address is valid for the given chain
    */
   isValidAddress(address: string, chain: Chain): boolean {
     if (chain === Chain.SOLANA) {
       return this.isValidSolanaAddress(address);
+    }
+    if (chain === Chain.SUI) {
+      return this.isValidSuiAddress(address);
     }
     return this.isValidEVMAddress(address);
   }

@@ -168,6 +168,26 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
     },
     isEVM: false,
   },
+  [Chain.SUI]: {
+    id: Chain.SUI,
+    name: 'SUI',
+    chainId: 0, // SUI doesn't use chain ID
+    nativeCurrency: {
+      name: 'SUI',
+      symbol: 'SUI',
+      decimals: 9,
+    },
+    rpcUrls: [
+      'https://fullnode.mainnet.sui.io:443',
+      'https://sui-mainnet-rpc.blockhunters.dev',
+    ],
+    blockExplorer: {
+      name: 'Suiscan',
+      url: 'https://suiscan.xyz',
+      apiUrl: 'https://api.suiscan.xyz',
+    },
+    isEVM: false,
+  },
 };
 
 // Get chain config by chain ID
@@ -233,5 +253,10 @@ export const COMMON_TOKENS: Record<Chain, Record<string, string>> = {
     // Solana uses different address format
     USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+  },
+  [Chain.SUI]: {
+    // SUI uses different address format
+    USDC: '0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN',
+    USDT: '0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN',
   },
 };

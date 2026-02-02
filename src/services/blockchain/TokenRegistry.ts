@@ -32,6 +32,7 @@ const CHAIN_TO_COINGECKO_PLATFORM: Record<Chain, string> = {
   [Chain.BSC]: 'binance-smart-chain',
   [Chain.AVALANCHE]: 'avalanche',
   [Chain.SOLANA]: 'solana',
+  [Chain.SUI]: 'sui',
 };
 
 /**
