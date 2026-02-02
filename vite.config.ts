@@ -16,8 +16,8 @@ export default defineConfig({
         global: true,
         process: true,
       },
-      // Exclude ccxt and problematic modules
-      exclude: ['net', 'dns', 'tls', 'fs', 'child_process'],
+      // Exclude modules that we provide custom polyfills for
+      exclude: ['net', 'dns', 'tls', 'fs', 'child_process', 'module'],
     }),
     // Bundle analysis - generates stats.html when building
     visualizer({
@@ -70,6 +70,10 @@ export default defineConfig({
       '@electron': resolve(__dirname, 'electron'),
       // Polyfill for node:net (needed by CCXT's node-fetch)
       'node:net': resolve(__dirname, 'src/polyfills/net-polyfill.ts'),
+      // Use ESM version of eventemitter3 which has default export
+      'eventemitter3': resolve(__dirname, 'node_modules/eventemitter3/index.mjs'),
+      // Polyfill for node:module (createRequire needed by some packages)
+      'module': resolve(__dirname, 'src/polyfills/module-polyfill.ts'),
     },
   },
   build: {
