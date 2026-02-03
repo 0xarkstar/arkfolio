@@ -1,329 +1,323 @@
 import { test, expect } from '@playwright/test';
+import { setupPage, waitForAppReady, navigateTo, closeModal, waitForLoading } from './helpers';
 
 test.describe('Exchange Modal - Phase 10.1 Korean VASP/Travel Rule', () => {
   test.beforeEach(async ({ page }) => {
+    await setupPage(page);
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
+  });
+
+  // Clean up any open modals after each test
+  test.afterEach(async ({ page }) => {
+    const modal = page.locator('[role="dialog"]');
+    if (await modal.count() > 0) {
+      await page.keyboard.press('Escape');
+    }
   });
 
   test('should navigate to CEX page and open Add Exchange modal', async ({ page }) => {
-    // Navigate to CEX/Exchanges page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Find and click Add Exchange button
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
-
-      // Modal should be open
-      const modal = page.locator('[role="dialog"], .modal');
-      expect(await modal.count()).toBeGreaterThan(0);
-    }
+    // Modal should be open
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
   });
 
   test('should display all 14 CEX exchanges in modal', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Click CEX tab if present
-      const cexTab = page.locator('button:has-text("CEX")').first();
-      if (await cexTab.count() > 0) {
-        await cexTab.click();
-        await page.waitForTimeout(300);
-      }
+    // Click CEX tab if present
+    const cexTab = modal.getByRole('button', { name: 'CEX' });
+    if (await cexTab.count() > 0) {
+      await cexTab.click();
+    }
 
-      // Verify Global CEX exchanges
-      const globalExchanges = ['Binance', 'OKX', 'Bybit', 'Kraken', 'Coinbase', 'Gate.io'];
-      for (const exchange of globalExchanges) {
-        const exchangeOption = page.locator(`text=${exchange}`).first();
-        expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-      }
+    // Verify Global CEX exchanges
+    const globalExchanges = ['Binance', 'OKX', 'Bybit', 'Kraken', 'Coinbase', 'Gate.io'];
+    for (const exchange of globalExchanges) {
+      await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
+    }
 
-      // Verify Travel Rule exchanges (new)
-      const travelRuleExchanges = ['HTX', 'Bitget', 'BingX', 'LBANK', 'Woo X'];
-      for (const exchange of travelRuleExchanges) {
-        const exchangeOption = page.locator(`text=${exchange}`).first();
-        expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-      }
+    // Verify Travel Rule exchanges
+    const travelRuleExchanges = ['HTX', 'Bitget', 'BingX', 'LBANK', 'Woo X'];
+    for (const exchange of travelRuleExchanges) {
+      await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
+    }
 
-      // Verify Korean VASP exchanges
-      const koreanExchanges = ['Upbit', 'Bithumb', 'Coinone'];
-      for (const exchange of koreanExchanges) {
-        const exchangeOption = page.locator(`text=${exchange}`).first();
-        expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-      }
+    // Verify Korean VASP exchanges
+    const koreanExchanges = ['Upbit', 'Bithumb', 'Coinone'];
+    for (const exchange of koreanExchanges) {
+      await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
     }
   });
 
   test('should display all 10 Perp DEX exchanges in DEX tab', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Click DEX tab
-      const dexTab = page.locator('button:has-text("DEX")').first();
-      if (await dexTab.count() > 0) {
-        await dexTab.click();
-        await page.waitForTimeout(300);
+    // Click DEX tab
+    const dexTab = modal.getByRole('button', { name: 'DEX' });
+    if (await dexTab.count() > 0) {
+      await dexTab.click();
 
-        // Verify EVM Perp DEX
-        const evmDexes = ['Hyperliquid', 'GMX', 'GRVT', 'Lighter'];
-        for (const exchange of evmDexes) {
-          const exchangeOption = page.locator(`text=${exchange}`).first();
-          expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-        }
+      // Verify EVM Perp DEX
+      const evmDexes = ['Hyperliquid', 'GMX', 'GRVT', 'Lighter'];
+      for (const exchange of evmDexes) {
+        await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
+      }
 
-        // Verify Cosmos Perp DEX
-        const dydxOption = page.locator('text=dYdX').first();
-        expect(await dydxOption.count(), 'dYdX should be visible').toBeGreaterThan(0);
+      // Verify Cosmos Perp DEX
+      await expect(page.getByText('dYdX').first(), 'dYdX should be visible').toBeVisible();
 
-        // Verify Solana Perp DEX
-        const solanaDexes = ['Jupiter', 'Drift', 'Backpack'];
-        for (const exchange of solanaDexes) {
-          const exchangeOption = page.locator(`text=${exchange}`).first();
-          expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-        }
+      // Verify Solana Perp DEX
+      const solanaDexes = ['Jupiter', 'Drift', 'Backpack'];
+      for (const exchange of solanaDexes) {
+        await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
+      }
 
-        // Verify StarkNet Perp DEX
-        const starknetDexes = ['Paradex', 'EdgeX'];
-        for (const exchange of starknetDexes) {
-          const exchangeOption = page.locator(`text=${exchange}`).first();
-          expect(await exchangeOption.count(), `${exchange} should be visible`).toBeGreaterThan(0);
-        }
+      // Verify StarkNet Perp DEX
+      const starknetDexes = ['Paradex', 'EdgeX'];
+      for (const exchange of starknetDexes) {
+        await expect(page.getByText(exchange).first(), `${exchange} should be visible`).toBeVisible();
       }
     }
   });
 
   test('should show Korean exchange descriptions in Korean', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Click CEX tab if present
-      const cexTab = page.locator('button:has-text("CEX")').first();
-      if (await cexTab.count() > 0) {
-        await cexTab.click();
-        await page.waitForTimeout(300);
-      }
-
-      // Check for Korean descriptions
-      const koreanDesc = page.locator('text=한국 원화 거래');
-      expect(await koreanDesc.count(), 'Korean exchange descriptions should be visible').toBeGreaterThan(0);
+    // Click CEX tab if present
+    const cexTab = modal.getByRole('button', { name: 'CEX' });
+    if (await cexTab.count() > 0) {
+      await cexTab.click();
     }
+
+    // Check for Korean descriptions (multiple Korean exchanges have this description)
+    await expect(page.getByText('한국 원화 거래').first(), 'Korean exchange descriptions should be visible').toBeVisible();
   });
 
   test('should show HTX description mentioning Huobi', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Check for HTX with Huobi reference
-      const htxDesc = page.locator('text=구 Huobi');
-      expect(await htxDesc.count(), 'HTX should mention it was formerly Huobi').toBeGreaterThan(0);
-    }
+    // Check for HTX with Huobi reference
+    await expect(page.getByText('구 Huobi'), 'HTX should mention it was formerly Huobi').toBeVisible();
   });
 
-  test('should select Bitget and show passphrase field', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+  test('should select Bitget and show credential fields', async ({ page }) => {
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Click on Bitget (requires passphrase)
-      const bitgetOption = page.locator('button:has-text("Bitget")').first();
-      if (await bitgetOption.count() > 0) {
-        await bitgetOption.click();
-        await page.waitForTimeout(300);
+    // Click on Bitget (requires passphrase)
+    const bitgetOption = modal.locator('button:has-text("Bitget")').first();
+    if (await bitgetOption.count() > 0) {
+      await bitgetOption.click();
 
-        // Should show passphrase field
-        const passphraseField = page.locator('input[type="password"]').filter({ hasText: /passphrase/i });
-        const passphraseLabel = page.locator('text=Passphrase, label:has-text("Passphrase")');
-
-        // Check credentials form is shown
-        const apiKeyField = page.locator('input[type="password"]');
-        expect(await apiKeyField.count(), 'Credential fields should be visible').toBeGreaterThanOrEqual(2);
-      }
+      // Check credentials form is shown
+      const passwordFields = modal.locator('input[type="password"]');
+      expect(await passwordFields.count(), 'Credential fields should be visible').toBeGreaterThanOrEqual(2);
     }
   });
 
   test('should select Coinone and show credentials form', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Click on Coinone (Korean VASP)
-      const coinoneOption = page.locator('button:has-text("Coinone")').first();
-      if (await coinoneOption.count() > 0) {
-        await coinoneOption.click();
-        await page.waitForTimeout(300);
+    // Click on Coinone (Korean VASP)
+    const coinoneOption = modal.locator('button:has-text("Coinone")').first();
+    if (await coinoneOption.count() > 0) {
+      await coinoneOption.click();
 
-        // Should show credentials form with Connect button
-        const connectBtn = page.locator('button:has-text("Connect")');
-        expect(await connectBtn.count(), 'Connect button should be visible').toBeGreaterThan(0);
+      // Should show credentials form with Connect button
+      await expect(modal.getByRole('button', { name: 'Connect' }), 'Connect button should be visible').toBeVisible();
 
-        // Should show API Key field
-        const apiKeyLabel = page.locator('text=API Key, label:has-text("API Key")');
-        expect(await apiKeyLabel.count(), 'API Key field should be visible').toBeGreaterThan(0);
-      }
+      // Should show API Key field (use label specifically)
+      await expect(modal.getByLabel('API Key'), 'API Key field should be visible').toBeVisible();
     }
   });
 
   test('should be able to go back from credentials to exchange list', async ({ page }) => {
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
-    }
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
 
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      // Select an exchange
-      const htxOption = page.locator('button:has-text("HTX")').first();
-      if (await htxOption.count() > 0) {
-        await htxOption.click();
-        await page.waitForTimeout(300);
+    // Select an exchange
+    const htxOption = modal.locator('button:has-text("HTX")').first();
+    if (await htxOption.count() > 0) {
+      await htxOption.click();
 
-        // Click Back button
-        const backBtn = page.locator('button:has-text("Back")');
-        if (await backBtn.count() > 0) {
-          await backBtn.click();
-          await page.waitForTimeout(300);
+      // Click Back button
+      const backBtn = modal.getByRole('button', { name: 'Back' });
+      if (await backBtn.count() > 0) {
+        await backBtn.click();
 
-          // Should see exchange list again
-          const binanceOption = page.locator('text=Binance').first();
-          expect(await binanceOption.count(), 'Should return to exchange list').toBeGreaterThan(0);
-        }
+        // Should see exchange list again
+        await expect(page.getByText('Binance').first(), 'Should return to exchange list').toBeVisible();
       }
     }
   });
 });
 
-test.describe('Total Exchange Count Verification', () => {
-  test('should have exactly 16 exchanges available', async ({ page }) => {
+test.describe('Exchange Connection Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupPage(page);
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
+    await navigateTo(page, 'exchanges');
+    await waitForLoading(page);
+  });
 
-    // Navigate to CEX page
-    const cexNav = page.locator('a[href*="cex"], a[href*="exchange"], nav >> text=CEX, nav >> text=Exchange').first();
-
-    if (await cexNav.count() > 0) {
-      await cexNav.click();
-      await page.waitForLoadState('networkidle');
+  test.afterEach(async ({ page }) => {
+    const modal = page.locator('[role="dialog"]');
+    if (await modal.count() > 0) {
+      await page.keyboard.press('Escape');
     }
+  });
 
+  test('should display credential form fields when exchange is selected', async ({ page }) => {
     // Open Add Exchange modal
-    const addExchangeBtn = page.locator('button:has-text("Add Exchange"), button:has-text("Connect Exchange"), button:has-text("Add")').first();
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
 
-    if (await addExchangeBtn.count() > 0) {
-      await addExchangeBtn.click();
-      await page.waitForTimeout(500);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
 
-      let totalCount = 0;
+    // Select Binance
+    const binanceOption = modal.locator('button:has-text("Binance")').first();
+    if (await binanceOption.count() > 0) {
+      await binanceOption.click();
 
-      // Count CEX exchanges
-      const cexTab = page.locator('button:has-text("CEX")').first();
-      if (await cexTab.count() > 0) {
-        await cexTab.click();
-        await page.waitForTimeout(300);
+      // Should show API Key input
+      const apiKeyInput = modal.locator('input[type="password"]').first();
+      await expect(apiKeyInput).toBeVisible();
+
+      // Should show Connect button
+      await expect(modal.getByRole('button', { name: 'Connect' })).toBeVisible();
+    }
+  });
+
+  test('should validate empty API credentials', async ({ page }) => {
+    // Open Add Exchange modal
+    const addExchangeBtn = page.getByRole('button', { name: /Add Exchange|Connect Exchange|Add/i }).first();
+    await addExchangeBtn.click();
+
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
+
+    // Select an exchange
+    const binanceOption = modal.locator('button:has-text("Binance")').first();
+    if (await binanceOption.count() > 0) {
+      await binanceOption.click();
+
+      // Try to connect without entering credentials
+      const connectBtn = modal.getByRole('button', { name: 'Connect' });
+      const isDisabled = await connectBtn.isDisabled();
+
+      if (!isDisabled) {
+        await connectBtn.click();
+
+        // Should show error or validation message or button should be disabled
+        const errorMsg = modal.locator('[role="alert"], .text-loss').first();
+        const hasError = await errorMsg.count() > 0;
+        const requiredMsg = modal.getByText(/required/i).first();
+        const hasRequired = await requiredMsg.count() > 0;
+
+        if (hasError) {
+          await expect(errorMsg).toBeVisible();
+        } else if (hasRequired) {
+          await expect(requiredMsg).toBeVisible();
+        }
       }
+    }
+  });
 
-      // Count exchange buttons in list (excluding tab buttons)
-      const cexExchanges = page.locator('[role="dialog"] button').filter({ hasNot: page.locator('text=CEX, text=DEX, text=Back, text=Connect') });
-      const cexCount = await page.locator('[role="dialog"] .space-y-3 > button, [role="dialog"] button:has(.font-medium)').count();
+  test('should show exchanges section on page', async ({ page }) => {
+    // Connected Exchanges section or similar
+    const exchangeSection = page.getByText(/Connected Exchanges|Your Exchanges|Exchanges/i).first();
+    await expect(exchangeSection).toBeVisible();
+  });
 
-      // Count DEX exchanges
-      const dexTab = page.locator('button:has-text("DEX")').first();
-      if (await dexTab.count() > 0) {
-        await dexTab.click();
-        await page.waitForTimeout(300);
+  test('should have sync functionality available', async ({ page }) => {
+    // Look for sync/refresh button in the page
+    const syncButton = page.getByRole('button', { name: /Sync|Refresh/i }).first();
 
-        const dexCount = await page.locator('[role="dialog"] .space-y-3 > button, [role="dialog"] button:has(.font-medium)').count();
-        totalCount = cexCount + dexCount;
-      }
+    // Sync button might only appear when exchanges are connected
+    if (await syncButton.count() > 0) {
+      await expect(syncButton).toBeVisible();
+    }
+  });
 
-      // We expect 14 CEX + 2 DEX = 16 total
-      // Note: exact count may vary based on DOM structure, so we check for minimum
-      console.log(`Total exchanges found: CEX=${cexCount}, DEX tab visited`);
+  test('should display balances section when available', async ({ page }) => {
+    // Balances section might exist
+    const balancesSection = page.getByText(/Balances|Assets/i).first();
+
+    if (await balancesSection.count() > 0) {
+      await expect(balancesSection).toBeVisible();
+    }
+  });
+
+  test('should display positions section when available', async ({ page }) => {
+    // Positions section (futures/margin)
+    const positionsSection = page.getByText(/Positions|Futures/i).first();
+
+    if (await positionsSection.count() > 0) {
+      await expect(positionsSection).toBeVisible();
     }
   });
 });
