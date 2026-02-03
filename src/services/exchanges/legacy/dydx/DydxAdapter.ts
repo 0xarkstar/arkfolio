@@ -14,6 +14,7 @@ import {
   TransferHistoryParams,
   SupportedExchange,
 } from '../../types';
+import { logger } from '../../../../utils/logger';
 
 // dYdX v4 API response types
 interface DydxSubaccount {
@@ -120,6 +121,15 @@ interface DydxMarketsResponse {
   };
 }
 
+// WebSocket message types
+interface DydxWsMessage {
+  type?: string;
+  channel?: string;
+  contents?: {
+    markets?: Record<string, { oraclePrice?: string }>;
+  };
+}
+
 /**
  * dYdX v4 DEX Adapter
  *
@@ -222,7 +232,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
       await this.getSubaccount();
       return true;
     } catch (error) {
-      console.error('dYdX connection test failed:', error);
+      logger.error('dYdX connection test failed:', error);
       return false;
     }
   }
@@ -239,7 +249,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
         this.markets.set(ticker, market);
       });
     } catch (error) {
-      console.error('Failed to load dYdX markets:', error);
+      logger.error('Failed to load dYdX markets:', error);
     }
   }
 
@@ -489,7 +499,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
       this.ws = new WebSocket(this.WS_URL);
 
       this.ws.onopen = () => {
-        console.log('dYdX WebSocket connected');
+        logger.debug('dYdX WebSocket connected');
 
         // Subscribe to subaccount updates
         if (this.ws && this.walletAddress) {
@@ -516,16 +526,16 @@ export class DydxAdapter extends BaseExchangeAdapter {
           const data = JSON.parse(event.data);
           this.handleWebSocketMessage(data);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          logger.error('Failed to parse WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('dYdX WebSocket error:', error);
+        logger.error('dYdX WebSocket error:', error);
       };
 
       this.ws.onclose = () => {
-        console.log('dYdX WebSocket disconnected');
+        logger.debug('dYdX WebSocket disconnected');
         this.ws = null;
 
         // Attempt to reconnect after 5 seconds
@@ -536,7 +546,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
         }
       };
     } catch (error) {
-      console.error('Failed to connect dYdX WebSocket:', error);
+      logger.error('Failed to connect dYdX WebSocket:', error);
     }
   }
 
@@ -552,7 +562,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
     }
   }
 
-  private handleWebSocketMessage(data: any): void {
+  private handleWebSocketMessage(data: DydxWsMessage): void {
     if (!data.channel) return;
 
     switch (data.channel) {
@@ -566,7 +576,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
     }
   }
 
-  private handleSubaccountUpdate(data: any): void {
+  private handleSubaccountUpdate(data: DydxWsMessage): void {
     if (data.type === 'subscribed' || data.type === 'channel_data') {
       // Refresh positions and balances
       this.getFuturesPositions()
@@ -576,7 +586,7 @@ export class DydxAdapter extends BaseExchangeAdapter {
           });
         })
         .catch((error) => {
-          console.error('Failed to refresh positions:', error);
+          logger.error('Failed to refresh positions:', error);
         });
 
       this.getFuturesBalances()
@@ -586,15 +596,15 @@ export class DydxAdapter extends BaseExchangeAdapter {
           });
         })
         .catch((error) => {
-          console.error('Failed to refresh balances:', error);
+          logger.error('Failed to refresh balances:', error);
         });
     }
   }
 
-  private handleMarketsUpdate(data: any): void {
-    if (data.contents && data.contents.markets) {
+  private handleMarketsUpdate(data: DydxWsMessage): void {
+    if (data.contents?.markets) {
       // Update cached market data
-      Object.entries(data.contents.markets).forEach(([ticker, marketData]: [string, any]) => {
+      Object.entries(data.contents.markets).forEach(([ticker, marketData]) => {
         const existing = this.markets.get(ticker);
         if (existing && marketData.oraclePrice) {
           existing.oraclePrice = marketData.oraclePrice;

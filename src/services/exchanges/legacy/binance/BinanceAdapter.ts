@@ -106,6 +106,23 @@ interface BinanceFundingRate {
   fundingTime: number;
 }
 
+// WebSocket message types
+interface BinanceWsMessage {
+  e: string;
+  B?: Array<{ a: string; f: string; l: string }>;
+  a?: {
+    P?: Array<{
+      s: string;
+      ps: string;
+      pa: string;
+      ep: string;
+      up: string;
+      mt: string;
+      iw: string;
+    }>;
+  };
+}
+
 export class BinanceAdapter extends BaseExchangeAdapter {
   readonly exchangeId = SupportedExchange.BINANCE;
   readonly exchangeInfo: ExchangeInfo = {
@@ -526,26 +543,28 @@ export class BinanceAdapter extends BaseExchangeAdapter {
     }
   }
 
-  private handleWebSocketMessage(data: any): void {
+  private handleWebSocketMessage(data: BinanceWsMessage): void {
     switch (data.e) {
       case 'outboundAccountPosition':
         // Balance update
-        data.B.forEach((b: { a: string; f: string; l: string }) => {
-          const balance: Balance = {
-            asset: b.a,
-            free: this.toDecimal(b.f),
-            locked: this.toDecimal(b.l),
-            total: this.toDecimal(b.f).plus(this.toDecimal(b.l)),
-            balanceType: 'spot',
-          };
-          this.notifyBalanceUpdate(balance);
-        });
+        if (data.B) {
+          data.B.forEach((b) => {
+            const balance: Balance = {
+              asset: b.a,
+              free: this.toDecimal(b.f),
+              locked: this.toDecimal(b.l),
+              total: this.toDecimal(b.f).plus(this.toDecimal(b.l)),
+              balanceType: 'spot',
+            };
+            this.notifyBalanceUpdate(balance);
+          });
+        }
         break;
 
       case 'ACCOUNT_UPDATE':
         // Futures account update
         if (data.a?.P) {
-          data.a.P.forEach((p: any) => {
+          data.a.P.forEach((p) => {
             if (parseFloat(p.pa) !== 0) {
               const positionAmt = this.toDecimal(p.pa);
               const isLong = positionAmt.greaterThan(0);

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getDb } from '../database/init';
 import { settings } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 export interface AppSettings {
   // General
@@ -80,7 +81,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      logger.error('Failed to load settings:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load settings',
         isLoading: false,
@@ -117,7 +118,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isSaving: false,
       });
     } catch (error) {
-      console.error('Failed to save setting:', error);
+      logger.error('Failed to save setting:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to save setting',
         isSaving: false,
@@ -157,7 +158,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isSaving: false,
       });
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.error('Failed to save settings:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to save settings',
         isSaving: false,
@@ -181,7 +182,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isSaving: false,
       });
     } catch (error) {
-      console.error('Failed to reset settings:', error);
+      logger.error('Failed to reset settings:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to reset settings',
         isSaving: false,

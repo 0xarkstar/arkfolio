@@ -1,6 +1,8 @@
 declare module 'sql.js' {
+  export type SqlValue = string | number | null | Uint8Array;
+
   export interface Database {
-    run(sql: string, params?: any[]): void;
+    run(sql: string, params?: SqlValue[]): void;
     exec(sql: string): QueryExecResult[];
     export(): Uint8Array;
     close(): void;
@@ -9,7 +11,7 @@ declare module 'sql.js' {
 
   export interface QueryExecResult {
     columns: string[];
-    values: any[][];
+    values: SqlValue[][];
   }
 
   export interface SqlJsStatic {

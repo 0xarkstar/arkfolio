@@ -3,6 +3,7 @@ import { useDisconnect } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore, AppSettings } from '../../stores/settingsStore';
 import { getDb } from '../../database/init';
+import { logger } from '../../utils/logger';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Switch, Select, Input } from '../../components/Input';
@@ -61,7 +62,7 @@ export function SettingsPage() {
       // Note: API keys require Electron's safe storage for secure handling
     } catch {
       // Safe storage not available or no key stored
-      console.warn('Safe storage not available for API key retrieval');
+      logger.warn('Safe storage not available for API key retrieval');
     }
   };
 
@@ -82,10 +83,10 @@ export function SettingsPage() {
       try {
         const isValid = await zapperService.testConnection();
         if (!isValid) {
-          console.warn('Zapper API test failed, but saving key anyway (may be CORS issue)');
+          logger.warn('Zapper API test failed, but saving key anyway (may be CORS issue)');
         }
       } catch (testError) {
-        console.warn('Zapper API test error (likely CORS):', testError);
+        logger.warn('Zapper API test error (likely CORS):', testError);
         // Continue anyway - the key will be tested when actually used
       }
 
@@ -103,7 +104,7 @@ export function SettingsPage() {
       setZapperApiKey('');
       toast.success('Zapper API key saved. Test it by syncing DeFi positions.');
     } catch (error) {
-      console.error('Failed to save API key:', error);
+      logger.error('Failed to save API key:', error);
       toast.error('Failed to save API key');
       zapperService.clearConfig();
     } finally {
@@ -163,7 +164,7 @@ export function SettingsPage() {
       setExportStatus(null);
       toast.success('Data exported successfully');
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       setExportStatus(null);
       toast.error('Failed to export data');
     }
@@ -216,7 +217,7 @@ export function SettingsPage() {
         window.location.reload();
       }, 1500);
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('Import failed:', error);
       setImportStatus(null);
       toast.error('Failed to import data: Invalid file format');
     }
@@ -280,7 +281,7 @@ export function SettingsPage() {
       // Reload the page to reset all state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      console.error('Failed to clear data:', error);
+      logger.error('Failed to clear data:', error);
       toast.error('Failed to clear data. Please try again.');
     } finally {
       setIsClearing(false);

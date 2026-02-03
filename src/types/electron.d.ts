@@ -18,9 +18,11 @@ interface ElectronNetResponse<T = unknown> {
 }
 
 interface ElectronSafeStorage {
-  encrypt: (data: string) => Promise<string>;
-  decrypt: (data: string) => Promise<string>;
-  isEncryptionAvailable: () => Promise<boolean>;
+  encrypt: (key: string, value: string) => Promise<boolean>;
+  decrypt: (key: string) => Promise<string | null>;
+  delete: (key: string) => Promise<boolean>;
+  list: () => Promise<string[]>;
+  isAvailable: () => Promise<boolean>;
 }
 
 interface ElectronNet {

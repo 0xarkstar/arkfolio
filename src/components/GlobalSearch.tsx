@@ -99,8 +99,8 @@ export function GlobalSearch() {
 
   const handleSelect = (result: SearchResult) => {
     if (result.name.startsWith('Go to ')) {
-      const page = result.name.replace('Go to ', '').toLowerCase();
-      setView(page as any);
+      const page = result.name.replace('Go to ', '').toLowerCase() as ViewId;
+      setView(page);
     } else if (result.type === 'asset') {
       setView('portfolio');
     }

@@ -1,5 +1,6 @@
 import { app, safeStorage } from 'electron';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 
 interface StorageIndex {
@@ -44,14 +45,14 @@ export class SafeStorageService {
     return join(this.storagePath, safeKey);
   }
 
-  private loadIndex(): StorageIndex {
+  private async loadIndex(): Promise<StorageIndex> {
     try {
       if (!safeStorage.isEncryptionAvailable()) {
         return { keys: [] };
       }
 
       if (existsSync(this.indexPath)) {
-        const encrypted = readFileSync(this.indexPath);
+        const encrypted = await readFile(this.indexPath);
         const decrypted = safeStorage.decryptString(encrypted);
         return JSON.parse(decrypted);
       }
@@ -61,14 +62,14 @@ export class SafeStorageService {
     return { keys: [] };
   }
 
-  private saveIndex(index: StorageIndex): void {
+  private async saveIndex(index: StorageIndex): Promise<void> {
     if (!safeStorage.isEncryptionAvailable()) {
       return;
     }
 
     try {
       const encrypted = safeStorage.encryptString(JSON.stringify(index));
-      writeFileSync(this.indexPath, encrypted);
+      await writeFile(this.indexPath, encrypted);
     } catch (error) {
       console.error('Failed to save index:', error);
     }
@@ -83,12 +84,12 @@ export class SafeStorageService {
 
       const encrypted = safeStorage.encryptString(value);
       const keyPath = this.getKeyPath(key);
-      writeFileSync(keyPath, encrypted);
+      await writeFile(keyPath, encrypted);
 
-      const index = this.loadIndex();
+      const index = await this.loadIndex();
       if (!index.keys.includes(key)) {
         index.keys.push(key);
-        this.saveIndex(index);
+        await this.saveIndex(index);
       }
 
       return true;
@@ -110,7 +111,7 @@ export class SafeStorageService {
         return null;
       }
 
-      const encrypted = readFileSync(keyPath);
+      const encrypted = await readFile(keyPath);
       return safeStorage.decryptString(encrypted);
     } catch (error) {
       console.error('Failed to retrieve secret:', error);
@@ -122,13 +123,13 @@ export class SafeStorageService {
     try {
       const keyPath = this.getKeyPath(key);
       if (existsSync(keyPath)) {
-        unlinkSync(keyPath);
+        await unlink(keyPath);
       }
 
       if (safeStorage.isEncryptionAvailable()) {
-        const index = this.loadIndex();
+        const index = await this.loadIndex();
         index.keys = index.keys.filter(k => k !== key);
-        this.saveIndex(index);
+        await this.saveIndex(index);
       }
 
       return true;
@@ -140,7 +141,7 @@ export class SafeStorageService {
 
   async listKeys(): Promise<string[]> {
     try {
-      const index = this.loadIndex();
+      const index = await this.loadIndex();
       return index.keys;
     } catch (error) {
       console.error('Failed to list keys:', error);

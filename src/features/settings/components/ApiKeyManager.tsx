@@ -48,16 +48,16 @@ export function ApiKeyManager() {
       let stored: string | null = null;
 
       // Try to load from secure storage first (Electron)
-      if (hasElectronAPI()) {
-        stored = await (window as any).electronAPI.safeStorage.decrypt(API_KEY_HISTORY_STORAGE_KEY);
+      if (hasElectronAPI() && window.electronAPI?.safeStorage) {
+        stored = await window.electronAPI.safeStorage.decrypt(API_KEY_HISTORY_STORAGE_KEY);
       }
 
       // Fallback to localStorage for web or migration
       if (!stored && typeof localStorage !== 'undefined') {
         stored = localStorage.getItem('api_key_history');
         // Migrate from localStorage to secure storage if available
-        if (stored && hasElectronAPI()) {
-          await (window as any).electronAPI.safeStorage.encrypt(API_KEY_HISTORY_STORAGE_KEY, stored);
+        if (stored && hasElectronAPI() && window.electronAPI?.safeStorage) {
+          await window.electronAPI.safeStorage.encrypt(API_KEY_HISTORY_STORAGE_KEY, stored);
           localStorage.removeItem('api_key_history');
         }
       }
@@ -84,8 +84,8 @@ export function ApiKeyManager() {
       const data = JSON.stringify(arr);
 
       // Save to secure storage if available (Electron)
-      if (hasElectronAPI()) {
-        await (window as any).electronAPI.safeStorage.encrypt(API_KEY_HISTORY_STORAGE_KEY, data);
+      if (hasElectronAPI() && window.electronAPI?.safeStorage) {
+        await window.electronAPI.safeStorage.encrypt(API_KEY_HISTORY_STORAGE_KEY, data);
       } else if (typeof localStorage !== 'undefined') {
         // Fallback to localStorage for web
         localStorage.setItem('api_key_history', data);

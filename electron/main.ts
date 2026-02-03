@@ -11,6 +11,58 @@ interface HttpRequestOptions {
   timeout?: number;
 }
 
+// URL whitelist for net:request - only allow known exchange/crypto API endpoints
+const ALLOWED_URL_PATTERNS = [
+  // Major exchanges
+  /^https:\/\/api\.binance\.com\//,
+  /^https:\/\/.*\.binance\.com\/api\//,
+  /^https:\/\/api\.bybit\.com\//,
+  /^https:\/\/api\.okx\.com\//,
+  /^https:\/\/api\.kraken\.com\//,
+  /^https:\/\/api\.coinbase\.com\//,
+  /^https:\/\/api\.upbit\.com\//,
+  /^https:\/\/api\.bithumb\.com\//,
+  /^https:\/\/api\.gate\.io\//,
+  /^https:\/\/api\.htx\.com\//,
+  /^https:\/\/api\.bitget\.com\//,
+  /^https:\/\/open-api\.bingx\.com\//,
+  /^https:\/\/api\.lbank\.com\//,
+  /^https:\/\/api\.woo\.org\//,
+  /^https:\/\/api\.coinone\.co\.kr\//,
+  // DEX/Perp protocols
+  /^https:\/\/api\.hyperliquid\.xyz\//,
+  /^https:\/\/api\.dydx\.exchange\//,
+  /^https:\/\/indexer\.dydx\.trade\//,
+  // Blockchain/DeFi APIs
+  /^https:\/\/.*\.infura\.io\//,
+  /^https:\/\/.*\.alchemy\.com\//,
+  /^https:\/\/api\.etherscan\.io\//,
+  /^https:\/\/api\.zapper\.xyz\//,
+  /^https:\/\/api\.coingecko\.com\//,
+  /^https:\/\/pro-api\.coinmarketcap\.com\//,
+  // Solana
+  /^https:\/\/api\.mainnet-beta\.solana\.com\//,
+  /^https:\/\/.*\.helius-rpc\.com\//,
+];
+
+// Maximum request body size (1MB)
+const MAX_REQUEST_BODY_SIZE = 1024 * 1024;
+
+// Validate URL against whitelist
+function isUrlAllowed(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    // Must be HTTPS
+    if (parsedUrl.protocol !== 'https:') {
+      return false;
+    }
+    // Check against whitelist
+    return ALLOWED_URL_PATTERNS.some(pattern => pattern.test(url));
+  } catch {
+    return false;
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -92,6 +144,16 @@ function setupIpcHandlers() {
 
   // Network request handler - bypasses CORS by making requests from main process
   ipcMain.handle('net:request', async (_event, options: HttpRequestOptions) => {
+    // Validate URL against whitelist
+    if (!isUrlAllowed(options.url)) {
+      return Promise.reject(new Error(`URL not allowed: ${options.url}. Only requests to known exchange/crypto APIs are permitted.`));
+    }
+
+    // Validate request body size
+    if (options.body && options.body.length > MAX_REQUEST_BODY_SIZE) {
+      return Promise.reject(new Error(`Request body too large: ${options.body.length} bytes. Maximum allowed: ${MAX_REQUEST_BODY_SIZE} bytes.`));
+    }
+
     return new Promise((resolve, reject) => {
       const request = net.request({
         url: options.url,

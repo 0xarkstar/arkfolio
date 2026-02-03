@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/sql-js';
 import type { Database } from 'sql.js';
 import * as schema from './schema';
+import { logger } from '../utils/logger';
 
 // Type alias for sql.js Database
 type SqlJsDatabase = Database;
@@ -46,7 +47,7 @@ async function saveToOpfs(data: Uint8Array): Promise<void> {
     await writable.write(buffer);
     await writable.close();
   } catch (error) {
-    console.error('Failed to save database to OPFS:', error);
+    logger.error('Failed to save database to OPFS:', error);
     throw error;
   }
 }
@@ -69,9 +70,9 @@ export async function initDatabase(): Promise<void> {
 
   if (opfsAvailable) {
     existingData = await loadFromOpfs();
-    console.log('OPFS available, existing data:', existingData ? 'found' : 'not found');
+    logger.info('OPFS available, existing data:', existingData ? 'found' : 'not found');
   } else {
-    console.log('OPFS not available, using in-memory database');
+    logger.info('OPFS not available, using in-memory database');
   }
 
   // Create database instance
@@ -88,7 +89,7 @@ export async function initDatabase(): Promise<void> {
     setupAutoSave();
   }
 
-  console.log('Database initialized successfully');
+  logger.info('Database initialized successfully');
 }
 
 // Create all tables
@@ -248,6 +249,66 @@ async function createTables(): Promise<void> {
       updated_at INTEGER
     );
 
+    -- Portfolio Snapshots
+    CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+      id TEXT PRIMARY KEY,
+      timestamp INTEGER NOT NULL,
+      total_value_usd REAL NOT NULL,
+      cex_value_usd REAL DEFAULT 0,
+      onchain_value_usd REAL DEFAULT 0,
+      defi_value_usd REAL DEFAULT 0,
+      breakdown TEXT,
+      created_at INTEGER
+    );
+
+    -- Notifications
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT CHECK(type IN ('price_alert', 'liquidation_warning', 'system', 'sync_error')) NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      severity TEXT CHECK(severity IN ('info', 'warning', 'critical')) DEFAULT 'info',
+      is_read INTEGER DEFAULT 0,
+      metadata TEXT,
+      created_at INTEGER
+    );
+
+    -- Liquidation Alerts
+    CREATE TABLE IF NOT EXISTS liquidation_alerts (
+      id TEXT PRIMARY KEY,
+      position_id TEXT REFERENCES positions(id) ON DELETE CASCADE,
+      exchange_id TEXT REFERENCES exchanges(id) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      liquidation_price REAL NOT NULL,
+      warning_threshold REAL DEFAULT 0.1,
+      is_active INTEGER DEFAULT 1,
+      last_alert_at INTEGER,
+      created_at INTEGER
+    );
+
+    -- Price Alerts
+    CREATE TABLE IF NOT EXISTS price_alerts (
+      id TEXT PRIMARY KEY,
+      asset TEXT NOT NULL,
+      target_price REAL NOT NULL,
+      condition TEXT CHECK(condition IN ('above', 'below')) NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      is_triggered INTEGER DEFAULT 0,
+      triggered_at INTEGER,
+      note TEXT,
+      created_at INTEGER
+    );
+
+    -- Watchlist
+    CREATE TABLE IF NOT EXISTS watchlist (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      name TEXT NOT NULL,
+      price_alert_type TEXT CHECK(price_alert_type IN ('above', 'below')),
+      price_alert_target REAL,
+      added_at INTEGER
+    );
+
     -- Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_balances_exchange ON balances(exchange_id);
     CREATE INDEX IF NOT EXISTS idx_positions_exchange ON positions(exchange_id);
@@ -257,6 +318,9 @@ async function createTables(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_onchain_assets_wallet ON onchain_assets(wallet_id);
     CREATE INDEX IF NOT EXISTS idx_defi_positions_wallet ON defi_positions(wallet_id);
     CREATE INDEX IF NOT EXISTS idx_price_history_asset ON price_history(asset);
+    CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_timestamp ON portfolio_snapshots(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+    CREATE INDEX IF NOT EXISTS idx_price_alerts_asset ON price_alerts(asset);
   `;
 
   const statements = createTableStatements.split(';').filter(s => s.trim());
@@ -281,16 +345,16 @@ async function runMigrations(): Promise<void> {
     const columns = tableInfo[0]?.values?.map(row => row[1]) || [];
 
     if (!columns.includes('chain')) {
-      console.log('Migration: Adding chain column to defi_positions');
+      logger.info('Migration: Adding chain column to defi_positions');
       db.run("ALTER TABLE defi_positions ADD COLUMN chain TEXT DEFAULT 'Ethereum'");
     }
 
     if (!columns.includes('entry_date')) {
-      console.log('Migration: Adding entry_date column to defi_positions');
+      logger.info('Migration: Adding entry_date column to defi_positions');
       db.run("ALTER TABLE defi_positions ADD COLUMN entry_date INTEGER");
     }
   } catch (error) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
   }
 }
 
@@ -331,9 +395,9 @@ export async function persistDatabase(): Promise<void> {
   try {
     const data = db.export();
     await saveToOpfs(data);
-    console.log('Database persisted to OPFS');
+    logger.info('Database persisted to OPFS');
   } catch (error) {
-    console.error('Failed to persist database:', error);
+    logger.error('Failed to persist database:', error);
   }
 }
 
@@ -366,4 +430,61 @@ export async function closeDatabase(): Promise<void> {
 // Generate UUID for primary keys
 export function generateId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * Execute multiple database operations within a transaction
+ * Ensures atomicity for multi-table operations
+ *
+ * @param callback - Function containing database operations to execute
+ * @returns The result of the callback function
+ * @throws Error if any operation fails (all changes are rolled back)
+ *
+ * @example
+ * await withTransaction(async () => {
+ *   await db.insert(exchanges).values(exchange);
+ *   await db.insert(balances).values(balanceList);
+ * });
+ */
+export async function withTransaction<T>(
+  callback: () => Promise<T>
+): Promise<T> {
+  if (!db) {
+    throw new Error('Database not initialized');
+  }
+
+  try {
+    db.run('BEGIN TRANSACTION');
+    const result = await callback();
+    db.run('COMMIT');
+    return result;
+  } catch (error) {
+    db.run('ROLLBACK');
+    logger.error('Transaction failed, rolling back:', error);
+    throw error;
+  }
+}
+
+/**
+ * Execute multiple database operations within a transaction (sync version)
+ * For use with synchronous operations only
+ *
+ * @param callback - Function containing database operations to execute
+ * @returns The result of the callback function
+ */
+export function withTransactionSync<T>(callback: () => T): T {
+  if (!db) {
+    throw new Error('Database not initialized');
+  }
+
+  try {
+    db.run('BEGIN TRANSACTION');
+    const result = callback();
+    db.run('COMMIT');
+    return result;
+  } catch (error) {
+    db.run('ROLLBACK');
+    logger.error('Transaction failed, rolling back:', error);
+    throw error;
+  }
 }

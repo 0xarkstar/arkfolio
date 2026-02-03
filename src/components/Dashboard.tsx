@@ -7,6 +7,7 @@ import { useDefiStore } from '../stores/defiStore';
 import { priceService } from '../services/price';
 import { snapshotService } from '../services/portfolio/SnapshotService';
 import { toast } from './Toast';
+import { logger } from '../utils/logger';
 import Decimal from 'decimal.js';
 import { Watchlist } from './Watchlist';
 import { Card } from './Card';
@@ -86,7 +87,7 @@ export default function Dashboard() {
         toast.success('Market prices updated');
       }
     } catch (error) {
-      console.error('Failed to fetch market prices:', error);
+      logger.error('Failed to fetch market prices:', error);
       if (isManualRefresh) {
         toast.error('Failed to refresh prices');
       }

@@ -3,6 +3,7 @@ import { useAppStore } from './stores/appStore';
 import { useNavigationStore, ViewId } from './stores/navigationStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { initDatabase } from './database/init';
+import { logger } from './utils/logger';
 import { useAutoSync } from './hooks';
 import { useExchangeRealtimeSync } from './hooks/useExchangeRealtimeSync';
 import MainLayout from './components/layout/MainLayout';
@@ -57,7 +58,7 @@ function App() {
         await loadSettings();
         setIsLoading(false);
       } catch (err) {
-        console.error('Failed to initialize database:', err);
+        logger.error('Failed to initialize database:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize database');
         setIsLoading(false);
       }

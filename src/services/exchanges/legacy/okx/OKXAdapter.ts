@@ -110,6 +110,21 @@ interface OKXFundingRate {
   nextFundingTime: string;
 }
 
+// WebSocket message types
+interface OKXWsMessage {
+  event?: string;
+  code?: string;
+  arg?: {
+    channel?: string;
+    instType?: string;
+  };
+  data?: OKXWsAccountData[] | OKXPosition[];
+}
+
+interface OKXWsAccountData {
+  details?: OKXBalance[];
+}
+
 export class OKXAdapter extends BaseExchangeAdapter {
   readonly exchangeId = SupportedExchange.OKX;
   readonly exchangeInfo: ExchangeInfo = {
@@ -205,7 +220,7 @@ export class OKXAdapter extends BaseExchangeAdapter {
     method: 'GET' | 'POST' | 'DELETE',
     endpoint: string,
     params: Record<string, string | number | undefined> = {},
-    body?: Record<string, any>
+    body?: Record<string, unknown>
   ): Promise<OKXResponse<T>> {
     if (!this.credentials || !this.credentials.passphrase) {
       throw new Error('Not connected');
@@ -487,7 +502,7 @@ export class OKXAdapter extends BaseExchangeAdapter {
     this.ws.send(JSON.stringify(subscribeMsg));
   }
 
-  private handleWebSocketMessage(data: any): void {
+  private handleWebSocketMessage(data: OKXWsMessage): void {
     if (data.event === 'login' && data.code === '0') {
       logger.debug('OKX WebSocket authenticated');
       this.subscribeToChannels();
@@ -496,7 +511,8 @@ export class OKXAdapter extends BaseExchangeAdapter {
 
     if (data.arg?.channel === 'account' && data.data) {
       // Account balance update
-      data.data[0]?.details?.forEach((b: OKXBalance) => {
+      const accountData = data.data as OKXWsAccountData[];
+      accountData[0]?.details?.forEach((b: OKXBalance) => {
         const balance: Balance = {
           asset: b.ccy,
           free: this.toDecimal(b.availBal),
@@ -511,7 +527,8 @@ export class OKXAdapter extends BaseExchangeAdapter {
 
     if (data.arg?.channel === 'positions' && data.data) {
       // Position update
-      data.data.forEach((p: OKXPosition) => {
+      const positions = data.data as OKXPosition[];
+      positions.forEach((p: OKXPosition) => {
         if (parseFloat(p.pos) !== 0) {
           const posAmt = this.toDecimal(p.pos);
           const isLong = p.posSide === 'long' || (p.posSide === 'net' && posAmt.greaterThan(0));

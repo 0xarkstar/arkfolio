@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNftStore, NFT } from '../../stores/nftStore';
 import { useWalletsStore } from '../../stores/walletsStore';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { toast } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Card } from '../../components/Card';
@@ -312,10 +313,8 @@ export function NftPage() {
           <Button
             variant="primary"
             onClick={() => {
-              const { setView } = useNftStore.getState() as any;
-              if (typeof setView === 'function') {
-                setView('wallets');
-              }
+              // Navigate to wallets page using navigation store
+              useNavigationStore.getState().setView('wallets');
             }}
           >
             Go to Wallets

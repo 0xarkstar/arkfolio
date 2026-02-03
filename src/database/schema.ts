@@ -205,6 +205,16 @@ export const targetAllocations = sqliteTable('target_allocations', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// Watchlist
+export const watchlist = sqliteTable('watchlist', {
+  id: text('id').primaryKey(),
+  symbol: text('symbol').notNull(),
+  name: text('name').notNull(),
+  priceAlertType: text('price_alert_type', { enum: ['above', 'below'] }),
+  priceAlertTarget: real('price_alert_target'),
+  addedAt: integer('added_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
 // Relations
 export const exchangesRelations = relations(exchanges, ({ many }) => ({
   balances: many(balances),
@@ -278,3 +288,5 @@ export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 export type TargetAllocation = typeof targetAllocations.$inferSelect;
 export type NewTargetAllocation = typeof targetAllocations.$inferInsert;
+export type WatchlistItem = typeof watchlist.$inferSelect;
+export type NewWatchlistItem = typeof watchlist.$inferInsert;

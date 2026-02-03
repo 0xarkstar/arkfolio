@@ -536,14 +536,174 @@ export class CCXTAdapter extends BaseExchangeAdapter {
 
   async getEarnPositions(): Promise<EarnPosition[]> {
     // CCXT doesn't have a unified earn/staking API
-    // This would need exchange-specific implementation
+    // This needs exchange-specific implementation
     if (!this.config.supportedFeatures.earn) {
       return [];
     }
 
-    // For now, return empty array - would need custom implementation per exchange
-    logger.debug(`[CCXTAdapter] Earn positions not yet implemented for ${this.config.name}`);
-    return [];
+    try {
+      await this.checkRateLimit();
+
+      // Exchange-specific earn/staking implementations
+      switch (this.config.id) {
+        case SupportedExchange.BINANCE:
+          return this.getBinanceEarnPositions();
+        case SupportedExchange.OKX:
+          return this.getOkxEarnPositions();
+        case SupportedExchange.KRAKEN:
+          return this.getKrakenEarnPositions();
+        default:
+          logger.debug(`[CCXTAdapter] Earn positions not implemented for ${this.config.name}`);
+          return [];
+      }
+    } catch (error) {
+      const httpError = HttpError.fromError(error);
+      logger.warn(`[CCXTAdapter] Failed to fetch earn positions:`, httpError.getUserFriendlyMessage());
+      return [];
+    }
+  }
+
+  /**
+   * Fetch Binance Simple Earn positions (Flexible & Locked)
+   */
+  private async getBinanceEarnPositions(): Promise<EarnPosition[]> {
+    const positions: EarnPosition[] = [];
+    const exchange = this.getExchange();
+
+    try {
+      // Binance Simple Earn - Flexible positions
+      if (exchange.has['fetchBalance']) {
+        const flexibleResponse = await exchange.privateGetSimpleEarnFlexiblePosition();
+        if (flexibleResponse?.rows) {
+          for (const pos of flexibleResponse.rows) {
+            if (parseFloat(pos.totalAmount) > 0) {
+              positions.push({
+                id: `binance-flex-${pos.asset}`,
+                asset: pos.asset,
+                amount: this.toDecimal(pos.totalAmount),
+                type: 'flexible',
+                apy: parseFloat(pos.latestAnnualPercentageRate || 0) * 100,
+                accruedRewards: this.toDecimal(pos.cumulativeBonusRewards || 0),
+                rewardsAsset: pos.asset,
+              });
+            }
+          }
+        }
+      }
+
+      // Binance Simple Earn - Locked positions
+      try {
+        const lockedResponse = await exchange.privateGetSimpleEarnLockedPosition();
+        if (lockedResponse?.rows) {
+          for (const pos of lockedResponse.rows) {
+            if (parseFloat(pos.amount) > 0) {
+              positions.push({
+                id: `binance-locked-${pos.positionId}`,
+                asset: pos.asset,
+                amount: this.toDecimal(pos.amount),
+                type: 'locked',
+                apy: parseFloat(pos.apy || 0) * 100,
+                accruedRewards: this.toDecimal(pos.rewardAmt || 0),
+                rewardsAsset: pos.rewardAsset || pos.asset,
+                lockEndDate: pos.deliverDate ? new Date(pos.deliverDate) : undefined,
+              });
+            }
+          }
+        }
+      } catch {
+        // Locked earn might not be available for all accounts
+      }
+    } catch (error) {
+      logger.debug('[CCXTAdapter] Binance earn API error:', error);
+    }
+
+    return positions;
+  }
+
+  /**
+   * Fetch OKX Earn positions (Simple Earn & Staking)
+   */
+  private async getOkxEarnPositions(): Promise<EarnPosition[]> {
+    const positions: EarnPosition[] = [];
+    const exchange = this.getExchange();
+
+    try {
+      // OKX Finance - Savings positions
+      const savingsResponse = await exchange.privateGetFinanceSavingsBalance();
+      if (savingsResponse?.data) {
+        for (const pos of savingsResponse.data) {
+          if (parseFloat(pos.amt) > 0) {
+            positions.push({
+              id: `okx-savings-${pos.ccy}`,
+              asset: pos.ccy,
+              amount: this.toDecimal(pos.amt),
+              type: 'flexible',
+              apy: parseFloat(pos.rate || 0) * 100,
+              accruedRewards: this.toDecimal(pos.earnings || 0),
+              rewardsAsset: pos.ccy,
+            });
+          }
+        }
+      }
+
+      // OKX Staking positions
+      try {
+        const stakingResponse = await exchange.privateGetFinanceStakingDefiBalance();
+        if (stakingResponse?.data) {
+          for (const pos of stakingResponse.data) {
+            if (parseFloat(pos.amt) > 0) {
+              positions.push({
+                id: `okx-staking-${pos.ccy}-${pos.productId}`,
+                asset: pos.ccy,
+                amount: this.toDecimal(pos.amt),
+                type: pos.term === '0' ? 'flexible' : 'locked',
+                apy: parseFloat(pos.apy || 0) * 100,
+                accruedRewards: this.toDecimal(pos.earnings || 0),
+                rewardsAsset: pos.ccy,
+              });
+            }
+          }
+        }
+      } catch {
+        // Staking might not be available
+      }
+    } catch (error) {
+      logger.debug('[CCXTAdapter] OKX earn API error:', error);
+    }
+
+    return positions;
+  }
+
+  /**
+   * Fetch Kraken Staking positions
+   */
+  private async getKrakenEarnPositions(): Promise<EarnPosition[]> {
+    const positions: EarnPosition[] = [];
+    const exchange = this.getExchange();
+
+    try {
+      // Kraken Earn/Staking positions
+      const stakingResponse = await exchange.privatePostEarnAllocations();
+      if (stakingResponse?.result?.items) {
+        for (const pos of stakingResponse.result.items) {
+          if (parseFloat(pos.amount_allocated?.total) > 0) {
+            positions.push({
+              id: `kraken-earn-${pos.strategy_id}`,
+              asset: pos.native_asset,
+              amount: this.toDecimal(pos.amount_allocated.total),
+              type: pos.lock_type?.type === 'instant' ? 'flexible' : 'locked',
+              apy: parseFloat(pos.payout?.estimated_reward?.amount || 0),
+              accruedRewards: this.toDecimal(pos.total_rewarded || 0),
+              rewardsAsset: pos.native_asset,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      logger.debug('[CCXTAdapter] Kraken earn API error:', error);
+    }
+
+    return positions;
   }
 
   async getTradeHistory(params?: TradeHistoryParams): Promise<Trade[]> {

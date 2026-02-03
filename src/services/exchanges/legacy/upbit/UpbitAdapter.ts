@@ -14,6 +14,7 @@ import {
   TransferHistoryParams,
   SupportedExchange,
 } from '../../types';
+import { logger } from '../../../../utils/logger';
 
 // Upbit API response types
 interface UpbitAccount {
@@ -119,7 +120,7 @@ export class UpbitAdapter extends BaseExchangeAdapter {
       await this.signedRequest('GET', '/accounts');
       return true;
     } catch (error) {
-      console.error('Upbit connection test failed:', error);
+      logger.error('Upbit connection test failed:', error);
       return false;
     }
   }
@@ -137,7 +138,7 @@ export class UpbitAdapter extends BaseExchangeAdapter {
       throw new Error('Not connected');
     }
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, string> = {
       access_key: this.credentials.apiKey,
       nonce: crypto.randomUUID(),
     };
@@ -313,25 +314,25 @@ export class UpbitAdapter extends BaseExchangeAdapter {
     this.ws = new WebSocket(this.WS_URL);
 
     this.ws.onopen = () => {
-      console.log('Upbit WebSocket connected');
+      logger.debug('Upbit WebSocket connected');
     };
 
     this.ws.onmessage = (event) => {
       // Handle market data messages
       try {
-        const data = JSON.parse(event.data.toString());
-        console.log('Upbit WS message:', data);
+        const data = JSON.parse(event.data.toString()) as Record<string, unknown>;
+        logger.debug('Upbit WS message:', data);
       } catch {
         // Binary data
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error('Upbit WebSocket error:', error);
+      logger.error('Upbit WebSocket error:', error);
     };
 
     this.ws.onclose = () => {
-      console.log('Upbit WebSocket disconnected');
+      logger.debug('Upbit WebSocket disconnected');
       this.ws = null;
     };
   }

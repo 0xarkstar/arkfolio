@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useTaxStore } from '../../stores/taxStore';
 import { useExchangeStore } from '../../stores/exchangeStore';
 import { excelExportService } from '../../services/export';
+import { logger } from '../../utils/logger';
 import { toast } from '../../components/Toast';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -50,7 +51,7 @@ export function TaxPage() {
       setSyncResult({ trades: 0, transfers: 0 }); // Result tracking would need more work
       toast.success('Transaction history synced successfully');
     } catch (err) {
-      console.error('Failed to sync transactions:', err);
+      logger.error('Failed to sync transactions:', err);
       toast.error('Failed to sync transaction history');
     } finally {
       setIsSyncing(false);

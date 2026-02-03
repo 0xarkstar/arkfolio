@@ -77,6 +77,38 @@ interface HyperliquidAllMids {
   [coin: string]: string;
 }
 
+// Funding rate context from metaAndAssetCtxs endpoint
+interface HyperliquidAssetCtx {
+  funding?: string;
+  openInterest?: string;
+  prevDayPx?: string;
+  dayNtlVlm?: string;
+  premium?: string;
+  oraclePx?: string;
+  markPx?: string;
+}
+
+// WebSocket message types
+interface HyperliquidWsMessage {
+  channel?: string;
+  data?: HyperliquidUserEvent[];
+}
+
+interface HyperliquidUserEvent {
+  fills?: HyperliquidUserFill[];
+  liquidation?: {
+    lid: number;
+    liquidatedUser: string;
+  };
+  funding?: {
+    time: number;
+    coin: string;
+    usdc: string;
+    szi: string;
+    fundingRate: string;
+  };
+}
+
 /**
  * Hyperliquid DEX Adapter
  *
@@ -356,14 +388,14 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
     await this.checkRateLimit();
 
     // Get all mids which includes funding data
-    const response = await this.client.post<any>('/info', {
+    const response = await this.client.post<[HyperliquidMeta, HyperliquidAssetCtx[]]>('/info', {
       type: 'metaAndAssetCtxs',
     });
 
     const [meta, assetCtxs] = response.data;
     const rates: FundingRate[] = [];
 
-    assetCtxs.forEach((ctx: any, index: number) => {
+    assetCtxs.forEach((ctx: HyperliquidAssetCtx, index: number) => {
       const coin = meta.universe[index]?.name;
       if (!coin) return;
 
@@ -469,7 +501,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
     }
   }
 
-  private handleWebSocketMessage(data: any): void {
+  private handleWebSocketMessage(data: HyperliquidWsMessage): void {
     if (!data.channel) return;
 
     switch (data.channel) {
@@ -483,10 +515,10 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
     }
   }
 
-  private handleUserEvents(events: any): void {
+  private handleUserEvents(events: HyperliquidUserEvent[] | undefined): void {
     if (!events || !Array.isArray(events)) return;
 
-    events.forEach((event: any) => {
+    events.forEach((event: HyperliquidUserEvent) => {
       if (event.fills) {
         // Trade fills - we could notify about new trades
       }
