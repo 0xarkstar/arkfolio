@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import Decimal from 'decimal.js';
 import { Chain, TokenBalance, NativeBalance, TokenInfo } from './types';
+import { logger } from '../../utils/logger';
 
 interface SolscanTokenAccount {
   tokenAddress: string;
@@ -140,7 +141,7 @@ export class SolanaProvider {
 
       return balances;
     } catch (error) {
-      console.error('Failed to fetch Solana token balances:', error);
+      logger.error('Failed to fetch Solana token balances:', error);
       return [];
     }
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePortfolioStore } from '../stores/portfolioStore';
-import { useNavigationStore } from '../stores/navigationStore';
+import { useNavigationStore, type ViewId } from '../stores/navigationStore';
 
 interface SearchResult {
   type: 'asset' | 'exchange' | 'wallet';

@@ -8,6 +8,13 @@ import {
   sanitizeUserInput,
   sanitizeHtml,
   ValidationResult,
+  validateExchangeCredentials,
+  validateWalletInput,
+  validatePriceAlertInput,
+  assertValidCredentials,
+  assertValidWalletInput,
+  assertValidPriceAlertInput,
+  InputValidationError,
 } from '../validation';
 
 describe('validation utilities', () => {
@@ -195,6 +202,300 @@ describe('validation utilities', () => {
       expect(result.isValid).toBe(false);
       expect(result.error).toBeDefined();
       expect(typeof result.error).toBe('string');
+    });
+  });
+
+  describe('validateExchangeCredentials', () => {
+    it('should accept valid credentials', () => {
+      const result = validateExchangeCredentials({
+        apiKey: 'validApiKey12345',
+        apiSecret: 'validSecretKey123456',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toEqual({});
+      expect(result.sanitized).toBeDefined();
+      expect(result.sanitized?.apiKey).toBe('validApiKey12345');
+    });
+
+    it('should accept credentials with passphrase', () => {
+      const result = validateExchangeCredentials({
+        apiKey: 'validApiKey12345',
+        apiSecret: 'validSecretKey123456',
+        passphrase: 'myPassphrase',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.passphrase).toBe('myPassphrase');
+    });
+
+    it('should reject missing API key', () => {
+      const result = validateExchangeCredentials({
+        apiSecret: 'validSecretKey123456',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.apiKey).toBeDefined();
+    });
+
+    it('should reject missing API secret', () => {
+      const result = validateExchangeCredentials({
+        apiKey: 'validApiKey12345',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.apiSecret).toBeDefined();
+    });
+
+    it('should reject too short API key', () => {
+      const result = validateExchangeCredentials({
+        apiKey: 'short',
+        apiSecret: 'validSecretKey123456',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.apiKey).toContain('too short');
+    });
+
+    it('should reject too short API secret', () => {
+      const result = validateExchangeCredentials({
+        apiKey: 'validApiKey12345',
+        apiSecret: 'short',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.apiSecret).toContain('too short');
+    });
+
+    it('should trim whitespace from credentials', () => {
+      const result = validateExchangeCredentials({
+        apiKey: '  validApiKey12345  ',
+        apiSecret: '  validSecretKey123456  ',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.apiKey).toBe('validApiKey12345');
+      expect(result.sanitized?.apiSecret).toBe('validSecretKey123456');
+    });
+  });
+
+  describe('validateWalletInput', () => {
+    it('should accept valid EVM wallet', () => {
+      const result = validateWalletInput({
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f7c283',
+        chain: 'ethereum',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.chain).toBe('ethereum');
+    });
+
+    it('should accept valid Solana wallet', () => {
+      const result = validateWalletInput({
+        address: '5yBNKxM5wRxqXdqC9fqZJPv7kgWxD4KPmGMGMxJfBaL5',
+        chain: 'solana',
+      });
+
+      expect(result.isValid).toBe(true);
+    });
+
+    it('should accept wallet with label', () => {
+      const result = validateWalletInput({
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f7c283',
+        chain: 'ethereum',
+        label: 'My Wallet',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.label).toBe('My Wallet');
+    });
+
+    it('should reject missing address', () => {
+      const result = validateWalletInput({
+        chain: 'ethereum',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.address).toBeDefined();
+    });
+
+    it('should reject invalid address', () => {
+      const result = validateWalletInput({
+        address: 'invalid-address',
+        chain: 'ethereum',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.address).toBeDefined();
+    });
+
+    it('should reject unsupported chain', () => {
+      const result = validateWalletInput({
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f7c283',
+        chain: 'unsupported-chain',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.chain).toContain('Unsupported');
+    });
+
+    it('should normalize chain to lowercase', () => {
+      const result = validateWalletInput({
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f7c283',
+        chain: 'ETHEREUM',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.chain).toBe('ethereum');
+    });
+  });
+
+  describe('validatePriceAlertInput', () => {
+    it('should accept valid price alert', () => {
+      const result = validatePriceAlertInput({
+        asset: 'BTC',
+        targetPrice: 50000,
+        condition: 'above',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.asset).toBe('BTC');
+      expect(result.sanitized?.targetPrice).toBe(50000);
+      expect(result.sanitized?.condition).toBe('above');
+    });
+
+    it('should accept price as string', () => {
+      const result = validatePriceAlertInput({
+        asset: 'ETH',
+        targetPrice: '3000.50',
+        condition: 'below',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.targetPrice).toBe(3000.5);
+    });
+
+    it('should accept note', () => {
+      const result = validatePriceAlertInput({
+        asset: 'BTC',
+        targetPrice: 50000,
+        condition: 'above',
+        note: 'Time to sell',
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.sanitized?.note).toBe('Time to sell');
+    });
+
+    it('should reject missing asset', () => {
+      const result = validatePriceAlertInput({
+        targetPrice: 50000,
+        condition: 'above',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.asset).toBeDefined();
+    });
+
+    it('should reject missing target price', () => {
+      const result = validatePriceAlertInput({
+        asset: 'BTC',
+        condition: 'above',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.targetPrice).toBeDefined();
+    });
+
+    it('should reject zero or negative price', () => {
+      const result = validatePriceAlertInput({
+        asset: 'BTC',
+        targetPrice: 0,
+        condition: 'above',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.targetPrice).toBeDefined();
+    });
+
+    it('should reject invalid condition', () => {
+      const result = validatePriceAlertInput({
+        asset: 'BTC',
+        targetPrice: 50000,
+        condition: 'invalid' as 'above' | 'below',
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.condition).toBeDefined();
+    });
+  });
+
+  describe('assert functions', () => {
+    it('assertValidCredentials should return sanitized credentials', () => {
+      const result = assertValidCredentials({
+        apiKey: 'validApiKey12345',
+        apiSecret: 'validSecretKey123456',
+      });
+
+      expect(result.apiKey).toBe('validApiKey12345');
+    });
+
+    it('assertValidCredentials should throw InputValidationError', () => {
+      expect(() => assertValidCredentials({})).toThrow(InputValidationError);
+    });
+
+    it('assertValidWalletInput should return sanitized input', () => {
+      const result = assertValidWalletInput({
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f7c283',
+        chain: 'ethereum',
+      });
+
+      expect(result.chain).toBe('ethereum');
+    });
+
+    it('assertValidWalletInput should throw InputValidationError', () => {
+      expect(() => assertValidWalletInput({})).toThrow(InputValidationError);
+    });
+
+    it('assertValidPriceAlertInput should return sanitized input', () => {
+      const result = assertValidPriceAlertInput({
+        asset: 'btc',
+        targetPrice: 50000,
+        condition: 'above',
+      });
+
+      expect(result?.asset).toBe('BTC');
+    });
+
+    it('assertValidPriceAlertInput should throw InputValidationError', () => {
+      expect(() => assertValidPriceAlertInput({})).toThrow(InputValidationError);
+    });
+  });
+
+  describe('InputValidationError', () => {
+    it('should have errors property', () => {
+      const error = new InputValidationError('Test', { field1: 'Error 1' });
+
+      expect(error.errors).toEqual({ field1: 'Error 1' });
+      expect(error.name).toBe('InputValidationError');
+    });
+
+    it('should return user-friendly message for single error', () => {
+      const error = new InputValidationError('Test', { field1: 'Error 1' });
+
+      expect(error.getUserFriendlyMessage()).toBe('Error 1');
+    });
+
+    it('should return user-friendly message for multiple errors', () => {
+      const error = new InputValidationError('Test', {
+        field1: 'Error 1',
+        field2: 'Error 2',
+      });
+
+      const message = error.getUserFriendlyMessage();
+      expect(message).toContain('Validation failed');
+      expect(message).toContain('Error 1');
+      expect(message).toContain('Error 2');
     });
   });
 });

@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import { getDb, generateId } from '../database/init';
 import { onchainAssets, wallets } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 export interface NFT {
   id: string;
@@ -123,7 +124,7 @@ export const useNftStore = create<NftState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Failed to load NFTs:', error);
+      logger.error('Failed to load NFTs:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load NFTs',
         isLoading: false,
@@ -203,7 +204,7 @@ export const useNftStore = create<NftState>((set, get) => ({
 
       set({ isSyncing: false });
     } catch (error) {
-      console.error('Failed to refresh floor prices:', error);
+      logger.error('Failed to refresh floor prices:', error);
       set({
         isSyncing: false,
         error: error instanceof Error ? error.message : 'Failed to refresh floor prices',

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from './Toast';
+import { logger } from '../utils/logger';
 
 interface CopyButtonProps {
   text: string;
@@ -32,7 +33,7 @@ export function CopyButton({
         setCopied(false);
       }, 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      logger.error('Failed to copy:', error);
       toast.error(errorMessage);
     }
   }, [text, successMessage, errorMessage]);

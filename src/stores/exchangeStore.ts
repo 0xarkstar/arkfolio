@@ -14,6 +14,8 @@ import { getDb, generateId } from '../database/init';
 import { exchanges, balances, positions } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { useSettingsStore } from './settingsStore';
+import { logger } from '../utils/logger';
+import { ExchangeError } from '../errors';
 
 export type WebSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -96,7 +98,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
 
       set({ accounts, isLoading: false });
     } catch (error) {
-      console.error('Failed to load exchange accounts:', error);
+      logger.error('Failed to load exchange accounts:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load accounts',
         isLoading: false,
@@ -160,7 +162,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
 
       return id;
     } catch (error) {
-      console.error('Failed to add exchange:', error);
+      logger.error('Failed to add exchange:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to add exchange',
         isLoading: false,
@@ -193,7 +195,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Failed to remove exchange:', error);
+      logger.error('Failed to remove exchange:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to remove exchange',
         isLoading: false,
@@ -205,7 +207,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   connectExchange: async (accountId, credentials) => {
     const { accounts } = get();
     const account = accounts.find(a => a.id === accountId);
-    if (!account) throw new Error('Account not found');
+    if (!account) throw ExchangeError.accountNotFound(accountId);
 
     try {
       await exchangeManager.connectExchange(account.exchangeId, credentials, accountId);
@@ -244,7 +246,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
     const adapter = exchangeManager.getAdapter(accountId);
 
     if (!adapter) {
-      throw new Error('Exchange not connected');
+      throw ExchangeError.notConnected();
     }
 
     try {
@@ -318,7 +320,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
         ),
       });
     } catch (error) {
-      console.error('Failed to sync exchange:', error);
+      logger.error('Failed to sync exchange:', error);
       set({
         accounts: accounts.map(a =>
           a.id === accountId
@@ -342,7 +344,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   syncTransactions: async (accountId, options = {}) => {
     const adapter = exchangeManager.getAdapter(accountId);
     if (!adapter) {
-      throw new Error('Exchange not connected');
+      throw ExchangeError.notConnected();
     }
 
     const result = await transactionSyncService.syncExchangeTransactions(accountId, {
@@ -369,7 +371,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
     // Check if realtime sync is enabled
     const { settings } = useSettingsStore.getState();
     if (!settings.realtimeSync) {
-      console.log('Realtime sync disabled, skipping WebSocket subscription');
+      logger.debug('Realtime sync disabled, skipping WebSocket subscription');
       return () => { };
     }
 
@@ -378,7 +380,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
       return () => { };
     }
 
-    console.log(`Enabling realtime WebSocket updates for account ${accountId}`);
+    logger.debug(`Enabling realtime WebSocket updates for account ${accountId}`);
 
     // Update WebSocket status to connecting
     const { updateWsStatus } = get();

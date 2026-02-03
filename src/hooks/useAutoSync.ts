@@ -3,6 +3,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useExchangeStore } from '../stores/exchangeStore';
 import { useWalletsStore } from '../stores/walletsStore';
 import { toast } from '../components/Toast';
+import { logger } from '../utils/logger';
 
 /**
  * Hook to automatically sync exchanges and wallets based on settings
@@ -66,7 +67,7 @@ export function useAutoSync() {
           toast.warning('Some data failed to sync');
         }
       } catch (error) {
-        console.error('Auto-sync failed:', error);
+        logger.error('Auto-sync failed:', error);
         toast.error('Auto-sync failed');
       }
     };

@@ -14,6 +14,7 @@ import {
 } from './types';
 import { CHAIN_CONFIGS, COMMON_TOKENS } from './chains';
 import { tokenRegistry } from './TokenRegistry';
+import { logger } from '../../utils/logger';
 
 // Map internal Chain enum to viem chains (EVM only)
 const VIEM_CHAINS: Record<string, ViemChain> = {
@@ -114,7 +115,7 @@ export class EVMProvider {
         balanceRaw: balance.toString(),
       };
     } catch (error) {
-      console.error(`Failed to fetch native balance for ${this.chain}:`, error);
+      logger.error(`Failed to fetch native balance for ${this.chain}:`, error);
       return {
         chain: this.chain,
         walletAddress: address,
@@ -296,9 +297,9 @@ export class EVMProvider {
       return balances;
     } catch (error) {
       if (error instanceof HttpError && error.type === HttpErrorType.RATE_LIMIT) {
-        console.warn(`${this.chain} explorer rate limit hit. Retry after ${error.retryAfter}s`);
+        logger.warn(`${this.chain} explorer rate limit hit. Retry after ${error.retryAfter}s`);
       } else {
-        console.warn(`Failed to get token list for ${this.chain}, falling back to common tokens:`, error);
+        logger.warn(`Failed to get token list for ${this.chain}, falling back to common tokens:`, error);
       }
       // Fallback to common tokens only
       return this.getCommonTokenBalances(address);
@@ -423,7 +424,7 @@ export class EVMProvider {
 
       return transactions;
     } catch (error) {
-      console.error(`Failed to fetch transaction history for ${this.chain}:`, error);
+      logger.error(`Failed to fetch transaction history for ${this.chain}:`, error);
       return [];
     }
   }

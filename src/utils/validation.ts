@@ -359,5 +359,266 @@ export function validateAlertThreshold(
   return { isValid: true, sanitized: numResult.sanitized };
 }
 
+/**
+ * Exchange credential validation schemas
+ */
+export interface ExchangeCredentials {
+  apiKey: string;
+  apiSecret: string;
+  passphrase?: string;
+}
+
+export interface CredentialValidationResult {
+  isValid: boolean;
+  errors: Record<string, string>;
+  sanitized?: ExchangeCredentials;
+}
+
+/**
+ * Validate exchange API credentials
+ */
+export function validateExchangeCredentials(credentials: Partial<ExchangeCredentials>): CredentialValidationResult {
+  const errors: Record<string, string> = {};
+
+  // Validate API key
+  if (!credentials.apiKey || typeof credentials.apiKey !== 'string') {
+    errors.apiKey = 'API key is required';
+  } else {
+    const apiKeyResult = validateApiKey(credentials.apiKey);
+    if (!apiKeyResult.isValid) {
+      errors.apiKey = apiKeyResult.error || 'Invalid API key';
+    }
+  }
+
+  // Validate API secret
+  if (!credentials.apiSecret || typeof credentials.apiSecret !== 'string') {
+    errors.apiSecret = 'API secret is required';
+  } else if (credentials.apiSecret.trim().length < 8) {
+    errors.apiSecret = 'API secret is too short';
+  } else if (credentials.apiSecret.trim().length > 256) {
+    errors.apiSecret = 'API secret is too long';
+  }
+
+  // Validate passphrase (optional but if provided, validate)
+  if (credentials.passphrase) {
+    if (typeof credentials.passphrase !== 'string') {
+      errors.passphrase = 'Passphrase must be a string';
+    } else if (credentials.passphrase.length > 128) {
+      errors.passphrase = 'Passphrase is too long';
+    }
+  }
+
+  const isValid = Object.keys(errors).length === 0;
+
+  return {
+    isValid,
+    errors,
+    sanitized: isValid
+      ? {
+          apiKey: credentials.apiKey!.trim(),
+          apiSecret: credentials.apiSecret!.trim(),
+          passphrase: credentials.passphrase?.trim(),
+        }
+      : undefined,
+  };
+}
+
+/**
+ * Wallet address validation schema
+ */
+export interface WalletAddressInput {
+  address: string;
+  chain: string;
+  label?: string;
+}
+
+export interface WalletValidationResult {
+  isValid: boolean;
+  errors: Record<string, string>;
+  sanitized?: WalletAddressInput;
+}
+
+const SUPPORTED_CHAINS = ['ethereum', 'polygon', 'arbitrum', 'optimism', 'base', 'bsc', 'solana', 'sui'];
+
+/**
+ * Validate wallet address input
+ */
+export function validateWalletInput(input: Partial<WalletAddressInput>): WalletValidationResult {
+  const errors: Record<string, string> = {};
+
+  // Validate address
+  if (!input.address || typeof input.address !== 'string') {
+    errors.address = 'Wallet address is required';
+  } else {
+    const addressResult = validateWalletAddress(input.address);
+    if (!addressResult.isValid) {
+      errors.address = addressResult.error || 'Invalid wallet address';
+    }
+  }
+
+  // Validate chain
+  if (!input.chain || typeof input.chain !== 'string') {
+    errors.chain = 'Chain is required';
+  } else {
+    const normalizedChain = input.chain.toLowerCase().trim();
+    if (!SUPPORTED_CHAINS.includes(normalizedChain)) {
+      errors.chain = `Unsupported chain. Supported: ${SUPPORTED_CHAINS.join(', ')}`;
+    }
+  }
+
+  // Validate label (optional)
+  if (input.label) {
+    if (typeof input.label !== 'string') {
+      errors.label = 'Label must be a string';
+    } else if (input.label.length > 100) {
+      errors.label = 'Label is too long (max 100 characters)';
+    }
+  }
+
+  const isValid = Object.keys(errors).length === 0;
+
+  return {
+    isValid,
+    errors,
+    sanitized: isValid
+      ? {
+          address: validateWalletAddress(input.address!).sanitized!,
+          chain: input.chain!.toLowerCase().trim(),
+          label: input.label?.trim(),
+        }
+      : undefined,
+  };
+}
+
+/**
+ * Validate price alert input
+ */
+export interface PriceAlertInput {
+  asset: string;
+  targetPrice: string | number;
+  condition: 'above' | 'below';
+  note?: string;
+}
+
+export interface PriceAlertValidationResult {
+  isValid: boolean;
+  errors: Record<string, string>;
+  sanitized?: {
+    asset: string;
+    targetPrice: number;
+    condition: 'above' | 'below';
+    note?: string;
+  };
+}
+
+export function validatePriceAlertInput(input: Partial<PriceAlertInput>): PriceAlertValidationResult {
+  const errors: Record<string, string> = {};
+
+  // Validate asset
+  if (!input.asset || typeof input.asset !== 'string') {
+    errors.asset = 'Asset symbol is required';
+  } else {
+    const assetResult = validateAssetSymbol(input.asset);
+    if (!assetResult.isValid) {
+      errors.asset = assetResult.error || 'Invalid asset symbol';
+    }
+  }
+
+  // Validate target price
+  if (input.targetPrice === undefined || input.targetPrice === null) {
+    errors.targetPrice = 'Target price is required';
+  } else {
+    const priceStr = String(input.targetPrice);
+    const priceResult = validateNumericString(priceStr, { min: 0 });
+    if (!priceResult.isValid) {
+      errors.targetPrice = priceResult.error || 'Invalid target price';
+    } else if (parseFloat(priceStr) <= 0) {
+      errors.targetPrice = 'Target price must be greater than 0';
+    }
+  }
+
+  // Validate condition
+  if (!input.condition) {
+    errors.condition = 'Condition is required';
+  } else if (input.condition !== 'above' && input.condition !== 'below') {
+    errors.condition = 'Condition must be "above" or "below"';
+  }
+
+  // Validate note (optional)
+  if (input.note && typeof input.note === 'string' && input.note.length > 500) {
+    errors.note = 'Note is too long (max 500 characters)';
+  }
+
+  const isValid = Object.keys(errors).length === 0;
+
+  return {
+    isValid,
+    errors,
+    sanitized: isValid
+      ? {
+          asset: validateAssetSymbol(input.asset!).sanitized!,
+          targetPrice: parseFloat(String(input.targetPrice)),
+          condition: input.condition!,
+          note: input.note?.trim(),
+        }
+      : undefined,
+  };
+}
+
+/**
+ * Validation error that can be thrown with detailed field errors
+ */
+export class InputValidationError extends Error {
+  readonly errors: Record<string, string>;
+
+  constructor(message: string, errors: Record<string, string>) {
+    super(message);
+    this.name = 'InputValidationError';
+    this.errors = errors;
+  }
+
+  getUserFriendlyMessage(): string {
+    const errorMessages = Object.values(this.errors);
+    if (errorMessages.length === 1) {
+      return errorMessages[0];
+    }
+    return `Validation failed: ${errorMessages.join(', ')}`;
+  }
+}
+
+/**
+ * Assert that credentials are valid, throw if not
+ */
+export function assertValidCredentials(credentials: Partial<ExchangeCredentials>): ExchangeCredentials {
+  const result = validateExchangeCredentials(credentials);
+  if (!result.isValid) {
+    throw new InputValidationError('Invalid exchange credentials', result.errors);
+  }
+  return result.sanitized!;
+}
+
+/**
+ * Assert that wallet input is valid, throw if not
+ */
+export function assertValidWalletInput(input: Partial<WalletAddressInput>): WalletAddressInput {
+  const result = validateWalletInput(input);
+  if (!result.isValid) {
+    throw new InputValidationError('Invalid wallet input', result.errors);
+  }
+  return result.sanitized!;
+}
+
+/**
+ * Assert that price alert input is valid, throw if not
+ */
+export function assertValidPriceAlertInput(input: Partial<PriceAlertInput>): PriceAlertValidationResult['sanitized'] {
+  const result = validatePriceAlertInput(input);
+  if (!result.isValid) {
+    throw new InputValidationError('Invalid price alert input', result.errors);
+  }
+  return result.sanitized!;
+}
+
 // Export patterns for testing
 export const VALIDATION_PATTERNS = PATTERNS;
+export const SUPPORTED_WALLET_CHAINS = SUPPORTED_CHAINS;

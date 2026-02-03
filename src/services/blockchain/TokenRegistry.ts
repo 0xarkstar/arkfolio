@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Chain } from './types';
+import { logger } from '../../utils/logger';
 
 export interface TokenMetadata {
   id: string;
@@ -133,9 +134,9 @@ class TokenRegistry {
         cachedAt: Date.now(),
       };
 
-      console.log(`TokenRegistry: Loaded ${tokens.size} tokens from CoinGecko`);
+      logger.debug(`TokenRegistry: Loaded ${tokens.size} tokens from CoinGecko`);
     } catch (error) {
-      console.error('TokenRegistry: Failed to load token list:', error);
+      logger.error('TokenRegistry: Failed to load token list:', error);
       // Keep existing cache if available
       if (!this.cache) {
         // Initialize with empty cache on first load failure

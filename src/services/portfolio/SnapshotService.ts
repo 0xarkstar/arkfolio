@@ -2,6 +2,7 @@ import { getDb, generateId } from '../../database/init';
 import { portfolioSnapshots } from '../../database/schema';
 import { desc, gte, lte } from 'drizzle-orm';
 import Decimal from 'decimal.js';
+import { logger } from '../../utils/logger';
 
 export interface SnapshotData {
   totalValueUsd: Decimal;
@@ -46,7 +47,7 @@ class SnapshotService {
     // Only save one snapshot per day
     const today = this.getDateString(now);
     if (this.lastSnapshotDate && this.getDateString(this.lastSnapshotDate) === today) {
-      console.log('Snapshot already saved for today, skipping');
+      logger.debug('Snapshot already saved for today, skipping');
       return;
     }
 
@@ -62,9 +63,9 @@ class SnapshotService {
       });
 
       this.lastSnapshotDate = now;
-      console.log(`Portfolio snapshot saved: $${data.totalValueUsd.toFixed(2)}`);
+      logger.debug(`Portfolio snapshot saved: $${data.totalValueUsd.toFixed(2)}`);
     } catch (error) {
-      console.error('Failed to save portfolio snapshot:', error);
+      logger.error('Failed to save portfolio snapshot:', error);
     }
   }
 
@@ -109,7 +110,7 @@ class SnapshotService {
         value: s.totalValueUsd,
       }));
     } catch (error) {
-      console.error('Failed to get portfolio snapshots:', error);
+      logger.error('Failed to get portfolio snapshots:', error);
       return [];
     }
   }
@@ -134,7 +135,7 @@ class SnapshotService {
         value: snapshot.totalValueUsd,
       };
     } catch (error) {
-      console.error('Failed to get latest snapshot:', error);
+      logger.error('Failed to get latest snapshot:', error);
       return null;
     }
   }
@@ -163,10 +164,10 @@ class SnapshotService {
         .delete(portfolioSnapshots)
         .where(lte(portfolioSnapshots.timestamp, twoYearsAgo));
 
-      console.log(`Cleaned up old snapshots`);
+      logger.debug(`Cleaned up old snapshots`);
       return 0; // Drizzle doesn't return count easily
     } catch (error) {
-      console.error('Failed to cleanup old snapshots:', error);
+      logger.error('Failed to cleanup old snapshots:', error);
       return 0;
     }
   }

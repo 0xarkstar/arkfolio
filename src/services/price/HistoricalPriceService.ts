@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../../utils/logger';
 
 interface PriceCache {
   [key: string]: {
@@ -82,7 +83,7 @@ class HistoricalPriceService {
       const coingeckoId = this.getCoingeckoId(tokenSymbol);
 
       if (!coingeckoId) {
-        console.warn(`No CoinGecko ID found for ${tokenSymbol}`);
+        logger.warn(`No CoinGecko ID found for ${tokenSymbol}`);
         return null;
       }
 
@@ -112,7 +113,7 @@ class HistoricalPriceService {
 
       return null;
     } catch (error) {
-      console.error(`Failed to fetch historical price for ${tokenSymbol}:`, error);
+      logger.error(`Failed to fetch historical price for ${tokenSymbol}:`, error);
       return null;
     }
   }
@@ -167,7 +168,7 @@ class HistoricalPriceService {
         price: p[1],
       }));
     } catch (error) {
-      console.error(`Failed to fetch price range for ${tokenSymbol}:`, error);
+      logger.error(`Failed to fetch price range for ${tokenSymbol}:`, error);
       return null;
     }
   }

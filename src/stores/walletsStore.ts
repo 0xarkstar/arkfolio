@@ -5,6 +5,7 @@ import { wallets, onchainAssets } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { walletService, Chain, WalletSummary, TokenBalance, NativeBalance } from '../services/blockchain';
 import { getEVMChains } from '../services/blockchain/chains';
+import { logger } from '../utils/logger';
 
 // Wallet types: EVM (all EVM chains), SOLANA, or SUI
 export type WalletType = 'EVM' | 'SOLANA' | 'SUI';
@@ -111,7 +112,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
         get().syncAllWallets();
       }
     } catch (error) {
-      console.error('Failed to load wallets:', error);
+      logger.error('Failed to load wallets:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load wallets',
         isLoading: false,
@@ -181,7 +182,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
 
       return id;
     } catch (error) {
-      console.error('Failed to add wallet:', error);
+      logger.error('Failed to add wallet:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to add wallet',
         isLoading: false,
@@ -208,7 +209,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Failed to remove wallet:', error);
+      logger.error('Failed to remove wallet:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to remove wallet',
         isLoading: false,
@@ -312,7 +313,7 @@ export const useWalletsStore = create<WalletsState>((set, get) => ({
         }
       }
     } catch (error) {
-      console.error(`Failed to sync wallet ${walletId}:`, error);
+      logger.error(`Failed to sync wallet ${walletId}:`, error);
       set({
         wallets: get().wallets.map((w) =>
           w.id === walletId

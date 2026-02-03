@@ -14,6 +14,7 @@ import {
   SubscriptionCallback,
   RateLimitConfig,
 } from './types';
+import { logger } from '../../utils/logger';
 
 interface RateLimitState {
   requests: number;
@@ -100,7 +101,7 @@ export abstract class BaseExchangeAdapter implements IExchangeAdapter {
       try {
         callback(balance);
       } catch (error) {
-        console.error('Error in balance subscriber:', error);
+        logger.error('Error in balance subscriber:', error);
       }
     });
   }
@@ -110,7 +111,7 @@ export abstract class BaseExchangeAdapter implements IExchangeAdapter {
       try {
         callback(position);
       } catch (error) {
-        console.error('Error in position subscriber:', error);
+        logger.error('Error in position subscriber:', error);
       }
     });
   }

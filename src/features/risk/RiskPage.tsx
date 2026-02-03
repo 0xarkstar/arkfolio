@@ -12,6 +12,7 @@ import { SkeletonCard } from '../../components/Skeleton';
 import { ProgressBar } from '../../components/ProgressBar';
 import { VaRCalculator, CorrelationMatrix } from './components';
 import Decimal from 'decimal.js';
+import { logger } from '../../utils/logger';
 
 export function RiskPage() {
   const { allPositions } = useExchangeStore();
@@ -41,7 +42,7 @@ export function RiskPage() {
       setLastRefresh(new Date());
       if (showToast) toast.success('Risk data refreshed');
     } catch (error) {
-      console.error('Failed to refresh risk data:', error);
+      logger.error('Failed to refresh risk data:', error);
       if (showToast) toast.error('Failed to refresh risk data');
     } finally {
       setIsRefreshing(false);

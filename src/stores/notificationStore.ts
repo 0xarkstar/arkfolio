@@ -10,6 +10,7 @@ import {
 } from '../database/schema';
 import { eq, desc } from 'drizzle-orm';
 import { toast } from '../components/Toast';
+import { logger } from '../utils/logger';
 
 interface NotificationState {
   // Price Alerts
@@ -65,7 +66,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const alerts = await db.select().from(priceAlerts).orderBy(desc(priceAlerts.createdAt));
       set({ priceAlerts: alerts, isPriceAlertsLoading: false });
     } catch (error) {
-      console.error('Failed to load price alerts:', error);
+      logger.error('Failed to load price alerts:', error);
       set({ isPriceAlertsLoading: false });
     }
   },
@@ -84,7 +85,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set((state) => ({ priceAlerts: [newAlert, ...state.priceAlerts] }));
       toast.success(`Price alert set for ${alert.asset}`);
     } catch (error) {
-      console.error('Failed to add price alert:', error);
+      logger.error('Failed to add price alert:', error);
       toast.error('Failed to create price alert');
     }
   },
@@ -96,7 +97,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set((state) => ({ priceAlerts: state.priceAlerts.filter((a) => a.id !== id) }));
       toast.info('Price alert deleted');
     } catch (error) {
-      console.error('Failed to delete price alert:', error);
+      logger.error('Failed to delete price alert:', error);
       toast.error('Failed to delete price alert');
     }
   },
@@ -109,7 +110,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         priceAlerts: state.priceAlerts.map((a) => (a.id === id ? { ...a, isActive } : a)),
       }));
     } catch (error) {
-      console.error('Failed to toggle price alert:', error);
+      logger.error('Failed to toggle price alert:', error);
     }
   },
 
@@ -121,7 +122,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const alerts = await db.select().from(liquidationAlerts).orderBy(desc(liquidationAlerts.createdAt));
       set({ liquidationAlerts: alerts, isLiquidationAlertsLoading: false });
     } catch (error) {
-      console.error('Failed to load liquidation alerts:', error);
+      logger.error('Failed to load liquidation alerts:', error);
       set({ isLiquidationAlertsLoading: false });
     }
   },
@@ -139,7 +140,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set((state) => ({ liquidationAlerts: [newAlert, ...state.liquidationAlerts] }));
       toast.success(`Liquidation alert set for ${alert.symbol}`);
     } catch (error) {
-      console.error('Failed to add liquidation alert:', error);
+      logger.error('Failed to add liquidation alert:', error);
       toast.error('Failed to create liquidation alert');
     }
   },
@@ -151,7 +152,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set((state) => ({ liquidationAlerts: state.liquidationAlerts.filter((a) => a.id !== id) }));
       toast.info('Liquidation alert deleted');
     } catch (error) {
-      console.error('Failed to delete liquidation alert:', error);
+      logger.error('Failed to delete liquidation alert:', error);
       toast.error('Failed to delete liquidation alert');
     }
   },
@@ -169,7 +170,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const unread = notifs.filter((n) => !n.isRead).length;
       set({ notifications: notifs, unreadCount: unread, isNotificationsLoading: false });
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      logger.error('Failed to load notifications:', error);
       set({ isNotificationsLoading: false });
     }
   },
@@ -198,7 +199,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         toast.info(notification.message);
       }
     } catch (error) {
-      console.error('Failed to add notification:', error);
+      logger.error('Failed to add notification:', error);
     }
   },
 
@@ -211,7 +212,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount: Math.max(0, state.unreadCount - 1),
       }));
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      logger.error('Failed to mark notification as read:', error);
     }
   },
 
@@ -224,7 +225,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount: 0,
       }));
     } catch (error) {
-      console.error('Failed to mark all as read:', error);
+      logger.error('Failed to mark all as read:', error);
     }
   },
 
@@ -234,7 +235,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       await db.delete(notifications);
       set({ notifications: [], unreadCount: 0 });
     } catch (error) {
-      console.error('Failed to clear notifications:', error);
+      logger.error('Failed to clear notifications:', error);
     }
   },
 

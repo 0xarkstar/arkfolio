@@ -11,6 +11,7 @@ import { Badge } from '../../../components/Badge';
 import { AssetAvatar } from '../../../components/Avatar';
 import { NoDataEmptyState, NoResultsEmptyState } from '../../../components/EmptyState';
 import { SkeletonTableRow } from '../../../components/Skeleton';
+import { logger } from '../../../utils/logger';
 
 interface Transaction {
   id: string;
@@ -56,7 +57,7 @@ export function TransactionsTable() {
           timestamp: row.timestamp as Date,
         })));
       } catch (error) {
-        console.error('Failed to load transactions:', error);
+        logger.error('Failed to load transactions:', error);
       } finally {
         setIsLoading(false);
       }

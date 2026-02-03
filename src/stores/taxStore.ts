@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { taxService, TaxSummary, TaxableTransaction } from '../services/tax';
+import { logger } from '../utils/logger';
 
 interface TaxState {
   selectedYear: number;
@@ -42,7 +43,7 @@ export const useTaxStore = create<TaxState>((set, get) => ({
         lastCalculated: new Date(),
       });
     } catch (error) {
-      console.error('Failed to calculate tax:', error);
+      logger.error('Failed to calculate tax:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to calculate tax',
         isLoading: false,
@@ -57,7 +58,7 @@ export const useTaxStore = create<TaxState>((set, get) => ({
     try {
       await taxService.saveTaxReport(summary);
     } catch (error) {
-      console.error('Failed to save tax report:', error);
+      logger.error('Failed to save tax report:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to save report',
       });
@@ -80,7 +81,7 @@ export const useTaxStore = create<TaxState>((set, get) => ({
         await get().calculateTax();
       }
     } catch (error) {
-      console.error('Failed to load tax report:', error);
+      logger.error('Failed to load tax report:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load report',
         isLoading: false,

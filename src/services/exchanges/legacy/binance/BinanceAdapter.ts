@@ -578,7 +578,7 @@ export class BinanceAdapter extends BaseExchangeAdapter {
                 markPrice: new Decimal(0),
                 unrealizedPnl: this.toDecimal(p.up),
                 leverage: 1,
-                marginType: p.mt?.toLowerCase() || 'cross',
+                marginType: (p.mt?.toLowerCase() === 'isolated' ? 'isolated' : 'cross') as 'cross' | 'isolated',
                 margin: this.toDecimal(p.iw),
                 notional: new Decimal(0),
               };

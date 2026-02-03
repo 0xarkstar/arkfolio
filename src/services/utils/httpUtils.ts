@@ -582,3 +582,13 @@ export function getUserFriendlyError(error: unknown): string {
   }
   return getErrorMessage(error);
 }
+
+/**
+ * Check if Electron's net API is available for making HTTP requests
+ * This bypasses CORS restrictions when running in Electron
+ */
+export function isElectronNetAvailable(): boolean {
+  return typeof window !== 'undefined' &&
+    !!window.electronAPI?.net &&
+    typeof window.electronAPI.net.request === 'function';
+}

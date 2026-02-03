@@ -8,6 +8,7 @@ import { GlobalSearch } from '../GlobalSearch';
 import { toast } from '../Toast';
 import { Button } from '../Button';
 import { NotificationBell } from '../NotificationPanel';
+import { logger } from '../../utils/logger';
 
 const viewTitles: Record<ViewId, string> = {
   dashboard: 'Dashboard',
@@ -64,7 +65,7 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
         toast.success('All data synced successfully');
       }
     } catch (error) {
-      console.error('Sync failed:', error);
+      logger.error('Sync failed:', error);
       toast.error('Sync failed');
     } finally {
       setIsSyncing(false);

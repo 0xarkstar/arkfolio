@@ -13,6 +13,7 @@ export { DydxAdapter } from './legacy/dydx';
 import { IExchangeAdapter, SupportedExchange, ExchangeCredentials } from './types';
 import { CCXTAdapter, isCCXTSupported } from './CCXTAdapter';
 import { PDAIOAdapter, isPDAIOSupported } from './PDAIOAdapter';
+import { ExchangeError } from '../../errors';
 
 /**
  * Create an exchange adapter for the given exchange ID.
@@ -30,7 +31,7 @@ export function createExchangeAdapter(exchangeId: SupportedExchange): IExchangeA
     return new CCXTAdapter(exchangeId);
   }
 
-  throw new Error(`Unsupported exchange: ${exchangeId}`);
+  throw ExchangeError.notSupported(exchangeId);
 }
 
 // Exchange manager class for managing multiple exchange connections

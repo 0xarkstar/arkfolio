@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useWalletsStore } from '../stores/walletsStore';
 import { toast } from '../components/Toast';
+import { logger } from '../utils/logger';
 
 /**
  * Hook that syncs the connected wallet from RainbowKit to the walletsStore.
@@ -45,7 +46,7 @@ export function useWalletConnectionSync() {
         toast.success(`Added EVM wallet from connected account`);
       })
       .catch((error) => {
-        console.error('Failed to add connected wallet:', error);
+        logger.error('Failed to add connected wallet:', error);
       });
   }, [address, isConnected, wallets, addWallet]);
 }

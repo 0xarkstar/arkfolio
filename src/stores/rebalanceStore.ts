@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import { getDb, generateId } from '../database/init';
 import { targetAllocations } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 export interface TargetAllocation {
   id: string;
@@ -82,7 +83,7 @@ export const useRebalanceStore = create<RebalanceState>((set, get) => ({
 
       set({ allocations: loaded, isLoading: false });
     } catch (error) {
-      console.error('Failed to load target allocations:', error);
+      logger.error('Failed to load target allocations:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to load allocations',
         isLoading: false,
@@ -147,7 +148,7 @@ export const useRebalanceStore = create<RebalanceState>((set, get) => ({
         }));
       }
     } catch (error) {
-      console.error('Failed to save target allocation:', error);
+      logger.error('Failed to save target allocation:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to save allocation',
         isSaving: false,

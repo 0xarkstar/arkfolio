@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletsStore } from '../stores/walletsStore';
 import { toast } from '../components/Toast';
+import { logger } from '../utils/logger';
 
 /**
  * Hook that syncs the connected Solana wallet to the walletsStore.
@@ -47,7 +48,7 @@ export function useSolanaWalletSync() {
         toast.success(`Added Solana wallet from ${walletName}`);
       })
       .catch((error) => {
-        console.error('Failed to add connected Solana wallet:', error);
+        logger.error('Failed to add connected Solana wallet:', error);
       });
   }, [publicKey, connected, wallet, wallets, addWallet]);
 }

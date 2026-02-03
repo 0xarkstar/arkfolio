@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import Decimal from 'decimal.js';
 import { DefiPosition } from '../../stores/defiStore';
-import { httpWithRetry, HttpError, HttpErrorType } from '../utils/httpUtils';
+import { httpWithRetry, HttpError, HttpErrorType, isElectronNetAvailable } from '../utils/httpUtils';
+import { logger } from '../../utils/logger';
 
 export interface ZapperApiConfig {
   apiKey: string;
@@ -259,19 +260,6 @@ const TEST_QUERY = `
 `;
 
 /**
- * Check if Electron's net API is available
- */
-function isElectronNetAvailable(): boolean {
-  const available = typeof window !== 'undefined' &&
-    !!window.electronAPI?.net &&
-    typeof window.electronAPI.net.request === 'function';
-
-  console.log('Electron net API check:', { available });
-
-  return available;
-}
-
-/**
  * ZapperService - Service for auto-detecting DeFi positions using Zapper GraphQL API
  *
  * Features:
@@ -303,7 +291,7 @@ class ZapperService {
 
     // Use Electron's net API if available (bypasses CORS)
     if (isElectronNetAvailable() && window.electronAPI?.net) {
-      console.log('Using Electron net API for Zapper request');
+      logger.debug('Using Electron net API for Zapper request');
       const response = await window.electronAPI.net.request({
         url: this.apiBaseUrl,
         method: 'POST',
@@ -323,8 +311,8 @@ class ZapperService {
     }
 
     // Fallback to axios (may have CORS issues in browser)
-    console.log('Using axios for Zapper request');
-    console.log('API Key configured:', this.apiKey ? `${this.apiKey.slice(0, 4)}****` : 'NOT SET');
+    logger.debug('Using axios for Zapper request');
+    logger.debug('API Key configured:', this.apiKey ? `${this.apiKey.slice(0, 4)}****` : 'NOT SET');
     if (!this.client) {
       throw new Error('Zapper API client not initialized');
     }
@@ -342,7 +330,7 @@ class ZapperService {
     ).catch((error: unknown) => {
       // Convert to structured error with classification
       if (error instanceof HttpError) {
-        console.error(`Zapper API ${error.type} error:`, error.message);
+        logger.error(`Zapper API ${error.type} error:`, error.message);
         if (error.type === HttpErrorType.AUTH) {
           throw new Error('Zapper API authentication failed. Please check your API key.');
         }
@@ -355,9 +343,9 @@ class ZapperService {
       // Log detailed error info for debugging
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as AxiosError;
-        console.error('Zapper API error details:');
-        console.error('  Status:', axiosError.response?.status);
-        console.error('  Data:', JSON.stringify(axiosError.response?.data, null, 2));
+        logger.error('Zapper API error details:');
+        logger.error('  Status:', axiosError.response?.status);
+        logger.error('  Data:', JSON.stringify(axiosError.response?.data, null, 2));
       }
       throw error;
     });
@@ -449,7 +437,7 @@ class ZapperService {
 
       return positions;
     } catch (error) {
-      console.error('Failed to fetch Zapper positions:', error);
+      logger.error('Failed to fetch Zapper positions:', error);
       throw error;
     }
   }
@@ -470,7 +458,7 @@ class ZapperService {
       const positions = await this.fetchPositionsBatch(addresses, addressToWalletId);
       return positions;
     } catch (error) {
-      console.error('Failed to fetch positions for wallets:', error);
+      logger.error('Failed to fetch positions for wallets:', error);
       return [];
     }
   }
@@ -503,7 +491,7 @@ class ZapperService {
 
     // Check for GraphQL errors
     if (response?.errors?.length) {
-      console.error('Zapper GraphQL errors:', response.errors);
+      logger.error('Zapper GraphQL errors:', response.errors);
       throw new Error(response.errors?.[0]?.message || 'Unknown GraphQL error');
     }
 
@@ -636,7 +624,7 @@ class ZapperService {
         TEST_QUERY
       );
 
-      console.log('Zapper API test response:', response);
+      logger.debug('Zapper API test response:', response);
 
       // Check for authentication errors in response
       if (response?.errors) {
@@ -647,11 +635,11 @@ class ZapperService {
           e.extensions?.code === 'UNAUTHORIZED'
         );
         if (authError) {
-          console.error('Zapper API auth error:', authError.message);
+          logger.error('Zapper API auth error:', authError.message);
           return false;
         }
         // Other errors are OK as long as they're not auth errors
-        console.warn('Zapper API returned non-auth errors, key may be valid:', response.errors);
+        logger.warn('Zapper API returned non-auth errors, key may be valid:', response.errors);
       }
 
       // If we got data (even null) without auth errors, the key is valid
@@ -662,7 +650,7 @@ class ZapperService {
       // No data and no clear auth error - assume valid
       return true;
     } catch (error: unknown) {
-      console.error('Zapper API connection test failed:', error);
+      logger.error('Zapper API connection test failed:', error);
 
       // Check if error message indicates auth failure
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -671,12 +659,12 @@ class ZapperService {
         errorMessage.toLowerCase().includes('401') ||
         errorMessage.toLowerCase().includes('403')
       ) {
-        console.error('Zapper API authentication failed');
+        logger.error('Zapper API authentication failed');
         return false;
       }
 
       // For other errors (network, timeout, etc.), we can't determine key validity
-      console.warn('Zapper API test had issues, but key might be valid');
+      logger.warn('Zapper API test had issues, but key might be valid');
       return false;
     }
   }

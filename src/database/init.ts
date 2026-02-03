@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/sql-js';
 import type { Database } from 'sql.js';
 import * as schema from './schema';
 import { logger } from '../utils/logger';
+import { DatabaseError } from '../errors';
 
 // Type alias for sql.js Database
 type SqlJsDatabase = Database;
@@ -94,7 +95,7 @@ export async function initDatabase(): Promise<void> {
 
 // Create all tables
 async function createTables(): Promise<void> {
-  if (!db) throw new Error('Database not initialized');
+  if (!db) throw DatabaseError.notInitialized();
 
   const createTableStatements = `
     -- Exchanges & Accounts
@@ -336,7 +337,7 @@ async function createTables(): Promise<void> {
 
 // Run database migrations
 async function runMigrations(): Promise<void> {
-  if (!db) throw new Error('Database not initialized');
+  if (!db) throw DatabaseError.notInitialized();
 
   // Migration: Add chain and entry_date columns to defi_positions
   try {
@@ -404,7 +405,7 @@ export async function persistDatabase(): Promise<void> {
 // Get Drizzle database instance
 export function getDb() {
   if (!drizzleDb) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
+    throw DatabaseError.notInitialized();
   }
   return drizzleDb;
 }
@@ -412,7 +413,7 @@ export function getDb() {
 // Get raw sql.js database instance (for direct queries if needed)
 export function getRawDb() {
   if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
+    throw DatabaseError.notInitialized();
   }
   return db;
 }
@@ -450,7 +451,7 @@ export async function withTransaction<T>(
   callback: () => Promise<T>
 ): Promise<T> {
   if (!db) {
-    throw new Error('Database not initialized');
+    throw DatabaseError.notInitialized();
   }
 
   try {
@@ -474,7 +475,7 @@ export async function withTransaction<T>(
  */
 export function withTransactionSync<T>(callback: () => T): T {
   if (!db) {
-    throw new Error('Database not initialized');
+    throw DatabaseError.notInitialized();
   }
 
   try {

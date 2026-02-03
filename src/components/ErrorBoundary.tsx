@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Card } from './Card';
 import { Button } from './Button';
+import { logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -29,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ errorInfo });
     this.props.onError?.(error, errorInfo);
   }
@@ -47,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
       localStorage.clear();
       sessionStorage.clear();
     } catch (e) {
-      console.error('Failed to clear storage:', e);
+      logger.error('Failed to clear storage:', e);
     }
     window.location.reload();
   };
@@ -147,7 +148,7 @@ export class SectionErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const sectionName = this.props.sectionName || 'Section';
-    console.error(`SectionErrorBoundary [${sectionName}] caught an error:`, error, errorInfo);
+    logger.error(`SectionErrorBoundary [${sectionName}] caught an error:`, error, errorInfo);
   }
 
   handleRetry = (): void => {

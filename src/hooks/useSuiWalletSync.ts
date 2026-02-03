@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useCurrentAccount, useCurrentWallet } from '@mysten/dapp-kit';
 import { useWalletsStore } from '../stores/walletsStore';
 import { toast } from '../components/Toast';
+import { logger } from '../utils/logger';
 
 /**
  * Hook that syncs the connected SUI wallet to the walletsStore.
@@ -48,7 +49,7 @@ export function useSuiWalletSync() {
         toast.success(`Added SUI wallet from ${walletName}`);
       })
       .catch((error) => {
-        console.error('Failed to add connected SUI wallet:', error);
+        logger.error('Failed to add connected SUI wallet:', error);
       });
   }, [currentAccount, connectionStatus, currentWallet, wallets, addWallet]);
 }

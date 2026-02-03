@@ -13,6 +13,7 @@ import {
   TransferHistoryParams,
   SupportedExchange,
 } from '../../types';
+import { logger } from '../../../../utils/logger';
 
 // Hyperliquid API response types
 interface HyperliquidAssetPosition {
@@ -200,7 +201,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
       await this.getUserState();
       return true;
     } catch (error) {
-      console.error('Hyperliquid connection test failed:', error);
+      logger.error('Hyperliquid connection test failed:', error);
       return false;
     }
   }
@@ -220,7 +221,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
         this.coinMeta.set(coin.name, coin.szDecimals);
       });
     } catch (error) {
-      console.error('Failed to load coin meta:', error);
+      logger.error('Failed to load coin meta:', error);
     }
   }
 
@@ -434,7 +435,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
       this.ws = new WebSocket(this.WS_URL);
 
       this.ws.onopen = () => {
-        console.log('Hyperliquid WebSocket connected');
+        logger.debug('Hyperliquid WebSocket connected');
 
         // Subscribe to user events
         if (this.ws && this.walletAddress) {
@@ -465,16 +466,16 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
           const data = JSON.parse(event.data);
           this.handleWebSocketMessage(data);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          logger.error('Failed to parse WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('Hyperliquid WebSocket error:', error);
+        logger.error('Hyperliquid WebSocket error:', error);
       };
 
       this.ws.onclose = () => {
-        console.log('Hyperliquid WebSocket disconnected');
+        logger.debug('Hyperliquid WebSocket disconnected');
         this.ws = null;
 
         // Attempt to reconnect after 5 seconds
@@ -485,7 +486,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
         }
       };
     } catch (error) {
-      console.error('Failed to connect Hyperliquid WebSocket:', error);
+      logger.error('Failed to connect Hyperliquid WebSocket:', error);
     }
   }
 
@@ -525,7 +526,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
 
       if (event.liquidation) {
         // Liquidation event
-        console.warn('Position liquidated:', event.liquidation);
+        logger.warn('Position liquidated:', event.liquidation);
       }
 
       if (event.funding) {
@@ -541,7 +542,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
         });
       })
       .catch((error) => {
-        console.error('Failed to refresh positions:', error);
+        logger.error('Failed to refresh positions:', error);
       });
 
     // Refresh balances
@@ -552,7 +553,7 @@ export class HyperliquidAdapter extends BaseExchangeAdapter {
         });
       })
       .catch((error) => {
-        console.error('Failed to refresh balances:', error);
+        logger.error('Failed to refresh balances:', error);
       });
   }
 }

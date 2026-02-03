@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, LineData, Time, AreaSeries } from 'lightweight-charts';
 import { snapshotService, SnapshotPeriod, PortfolioDataPoint } from '../../services/portfolio/SnapshotService';
+import { logger } from '../../utils/logger';
 
 interface PortfolioChartProps {
   data?: { time: string; value: number }[];
@@ -98,7 +99,7 @@ export function PortfolioChart({ height = 300, showTooltip = true, currentValue:
         return snapshots;
       }
     } catch (error) {
-      console.error('Failed to fetch snapshots:', error);
+      logger.error('Failed to fetch snapshots:', error);
     }
 
     // Fall back to mock data

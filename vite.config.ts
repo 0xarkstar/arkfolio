@@ -74,6 +74,8 @@ export default defineConfig({
       'eventemitter3': resolve(__dirname, 'node_modules/eventemitter3/index.mjs'),
       // Polyfill for node:module (createRequire needed by some packages)
       'module': resolve(__dirname, 'src/polyfills/module-polyfill.ts'),
+      // Stub for prom-client (Node.js Prometheus metrics, not needed in browser)
+      'prom-client': resolve(__dirname, 'src/polyfills/prom-client-stub.ts'),
     },
   },
   build: {
@@ -105,7 +107,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['sql.js'],
+    include: ['sql.js', '@grvt/client'],
     exclude: ['pd-aio-sdk', 'koffi'],
   },
   server: {
