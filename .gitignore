@@ -39,3 +39,7 @@ coverage/
 
 # Secure storage (should never be committed)
 secure-storage/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
